@@ -1,0 +1,114 @@
+# ==========================================
+# Environment files
+# ==========================================
+.env
+.env.*
+!.env.example
+*.env
+
+# ==========================================
+# Flutter / Dart
+# ==========================================
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+mobile/build/
+mobile/android/build/
+mobile/android/app/build/
+mobile/*.iml
+mobile/*.ipr
+mobile/*.iws
+mobile/.idea/
+mobile/android/.gradle/
+mobile/android/captures/
+mobile/android/gradlew
+mobile/android/gradlew.bat
+mobile/android/local.properties
+mobile/android/**/GeneratedPluginRegistrant.java
+mobile/ios/Flutter/.last_build_id
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/ephemeral/
+mobile/ios/Flutter/app.flx
+mobile/ios/Flutter/app.zip
+mobile/ios/Flutter/flutter_assets/
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/ios/ServiceDefinitions.json
+mobile/ios/Runner/GeneratedPluginRegistrant.*
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/**/generated_plugin_registrant.dart
+*.g.dart
+*.freezed.dart
+
+# ==========================================
+# Python / FastAPI
+# ==========================================
+backend/__pycache__/
+backend/**/__pycache__/
+*.py[cod]
+*$py.class
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.Python
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+backend/htmlcov/
+backend/.coverage
+backend/.coverage.*
+backend/instance/
+backend/alembic/versions/__pycache__/
+backend/media/
+
+# ==========================================
+# React / Node.js (admin)
+# ==========================================
+admin/node_modules/
+admin/build/
+admin/dist/
+admin/.next/
+admin/npm-debug.log*
+admin/yarn-debug.log*
+admin/yarn-error.log*
+admin/.pnpm-debug.log*
+admin/coverage/
+
+# ==========================================
+# PostgreSQL / local DB files
+# ==========================================
+*.sql.bak
+*.dump
+*.pgdata/
+pgdata/
+
+# ==========================================
+# VS Code
+# ==========================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# ==========================================
+# OS files
+# ==========================================
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# Docker (future phase)
+# ==========================================
+docker-compose.override.yml
+
+# ==========================================
+# Misc
+# ==========================================
+*.log
+.cache/
+test-labels/
