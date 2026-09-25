@@ -53,6 +53,48 @@ def test_admin_can_create_and_deactivate_staff():
     assert deactivate_response.json()["is_active"] is False
 
 
+def test_admin_can_reset_staff_password():
+    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    create_response = client.post(
+        "/staff",
+        json={
+            "full_name": "Reset Target",
+            "phone_number": "7000000001",
+            "password": "Original@123",
+            "role": "staff",
+        },
+        headers=headers,
+    )
+    assert create_response.status_code == 201
+    staff_id = create_response.json()["id"]
+
+    reset_response = client.post(
+        f"/staff/{staff_id}/reset-password",
+        json={"new_password": "NewPass@123"},
+        headers=headers,
+    )
+    assert reset_response.status_code == 200
+
+    assert _login("7000000001", "NewPass@123")
+
+    old_login = client.post(
+        "/auth/login", json={"phone_number": "7000000001", "password": "Original@123"}
+    )
+    assert old_login.status_code == 401
+
+
+def test_staff_user_cannot_reset_password():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    response = client.post(
+        "/staff/1/reset-password",
+        json={"new_password": "Whatever@123"},
+        headers={"Authorization": f"Bearer {staff_token}"},
+    )
+    assert response.status_code == 403
+
+
 def test_create_staff_with_duplicate_phone_fails():
     token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     response = client.post(

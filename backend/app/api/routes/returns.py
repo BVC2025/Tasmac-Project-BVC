@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
@@ -13,7 +14,7 @@ from app.models.bottle import Bottle, BottleStatus
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
 from app.models.return_transaction import RejectionReason, ReturnStatus, ReturnTransaction
 from app.models.shop import Shop
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.return_transaction import (
     CompleteReturnRequest,
     CompleteReturnResponse,
@@ -308,3 +309,27 @@ def list_my_returns(current_user: User = Depends(get_current_user), db: Session 
 def list_all_returns(admin_user: User = Depends(get_current_admin_user), db: Session = Depends(get_db)):
     transactions = db.query(ReturnTransaction).order_by(ReturnTransaction.id.desc()).all()
     return [_to_out(t) for t in transactions]
+
+
+@router.get("/{return_id}/evidence-image")
+def get_evidence_image(
+    return_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    transaction = db.get(ReturnTransaction, return_id)
+    if transaction is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Return not found")
+
+    is_owner = transaction.staff_user_id == current_user.id
+    if not is_owner and current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this evidence image")
+
+    if transaction.evidence_image_path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No evidence image for this return")
+
+    image_path = Path(transaction.evidence_image_path)
+    if not image_path.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence image file is missing")
+
+    return FileResponse(image_path)

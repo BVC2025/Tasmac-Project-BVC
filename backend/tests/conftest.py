@@ -6,7 +6,7 @@ from app.models.user import User
 
 # Tests run against the real dev database (no separate test DB yet), so
 # clean up the throwaway records each test creates before every run.
-TEST_STAFF_PHONES = ["7777777777"]
+TEST_STAFF_PHONES = ["7777777777", "7000000001"]
 TEST_SHOP_CODES = ["TST-001", "DUP-001"]
 
 

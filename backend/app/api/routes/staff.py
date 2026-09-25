@@ -5,7 +5,7 @@ from app.api.deps import get_current_admin_user
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.staff import StaffCreate, StaffOut, StaffUpdate
+from app.schemas.staff import ResetPasswordRequest, StaffCreate, StaffOut, StaffUpdate
 
 router = APIRouter(prefix="/staff", tags=["staff"], dependencies=[Depends(get_current_admin_user)])
 
@@ -51,6 +51,18 @@ def update_staff(staff_id: int, payload: StaffUpdate, db: Session = Depends(get_
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(user, field, value)
 
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.post("/{staff_id}/reset-password", response_model=StaffOut)
+def reset_password(staff_id: int, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    user = db.get(User, staff_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
+
+    user.hashed_password = hash_password(payload.new_password)
     db.commit()
     db.refresh(user)
     return user

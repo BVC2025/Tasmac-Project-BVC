@@ -18,6 +18,10 @@ class StaffUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class ResetPasswordRequest(BaseModel):
+    new_password: str
+
+
 class StaffOut(BaseModel):
     id: int
     full_name: str

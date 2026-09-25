@@ -21,16 +21,14 @@ class ServerUnavailableException implements Exception {
 }
 
 class ApiService {
-  // Backend runs locally during development, on the dev PC.
-  // - Chrome/web/Windows desktop: 127.0.0.1 works (same machine).
-  // - Physical Android device over USB: use 127.0.0.1 + `adb reverse tcp:8000 tcp:8000`
-  //   (tunnels the phone's localhost:8000 to the PC over the USB cable — avoids
-  //   WiFi/firewall/AP-isolation issues entirely).
-  // - Physical device over WiFi (same LAN, no AP isolation): use the PC's LAN IP instead.
-  // - Android emulator: use 10.0.2.2 instead of 127.0.0.1 to reach the host machine.
-  static const String baseUrl = 'http://127.0.0.1:8000';
+  // Backend is deployed on Render, backed by a Neon Postgres database —
+  // reachable from any device with internet access, no dev-PC networking
+  // tricks (USB/adb reverse/LAN IP) needed.
+  static const String baseUrl = 'https://tasmac-project-bvc.onrender.com';
 
-  static const Duration _defaultTimeout = Duration(seconds: 10);
+  // Render's free tier spins the backend down after inactivity; the first
+  // request after a spin-down can take 50+ seconds to wake it back up.
+  static const Duration _defaultTimeout = Duration(seconds: 60);
   // The payment step simulates a gateway call server-side (up to a couple of
   // seconds) inside the 30s on-screen countdown, so give it more headroom.
   static const Duration _paymentTimeout = Duration(seconds: 35);
@@ -119,6 +117,22 @@ class ApiService {
     }
 
     throw ApiException(_extractError(response.body) ?? 'Could not create staff');
+  }
+
+  Future<Map<String, dynamic>> resetStaffPassword(String token, int staffId, String newPassword) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/staff/$staffId/reset-password'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({'new_password': newPassword}),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_extractError(response.body) ?? 'Could not reset password');
   }
 
   Future<Map<String, dynamic>> deactivateStaff(String token, int staffId) async {
@@ -415,6 +429,14 @@ class ApiService {
     }
 
     throw ApiException(_extractError(response.body) ?? 'Could not submit rejection');
+  }
+
+  Future<Uint8List> getEvidenceImage(String token, int returnId) async {
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl/returns/$returnId/evidence-image'), headers: _authHeaders(token)),
+    );
+    if (response.statusCode == 200) return response.bodyBytes;
+    throw ApiException(_extractError(response.body) ?? 'Could not load evidence photo');
   }
 
   Future<List<dynamic>> listMyReturns(String token) async {

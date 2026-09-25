@@ -68,7 +68,7 @@ class _MyReturnsScreenState extends State<MyReturnsScreen> {
                 ),
                 isThreeLine: false,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => ReturnDetailScreen(item: item)),
+                  MaterialPageRoute(builder: (_) => ReturnDetailScreen(item: item, token: widget.token)),
                 ),
               );
             },

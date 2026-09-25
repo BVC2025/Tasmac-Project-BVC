@@ -38,6 +38,41 @@ class _StaffListScreenState extends State<StaffListScreen> {
     }
   }
 
+  Future<void> _resetPassword(int staffId, String staffName) async {
+    final controller = TextEditingController();
+    final newPassword = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Reset password — $staffName'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          decoration: const InputDecoration(labelText: 'New password'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+
+    if (newPassword == null || newPassword.isEmpty) return;
+
+    try {
+      await _apiService.resetStaffPassword(widget.token, staffId, newPassword);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset for $staffName. Share the new password with them securely.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,10 +119,20 @@ class _StaffListScreenState extends State<StaffListScreen> {
                 title: Text(member['full_name'] ?? ''),
                 subtitle: Text('${member['phone_number']} • ${member['role']}'),
                 trailing: isActive
-                    ? IconButton(
-                        icon: const Icon(Icons.block, color: Colors.red),
-                        tooltip: 'Deactivate',
-                        onPressed: () => _deactivate(member['id'] as int),
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.key, color: Colors.blueGrey),
+                            tooltip: 'Reset password',
+                            onPressed: () => _resetPassword(member['id'] as int, member['full_name'] ?? ''),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.block, color: Colors.red),
+                            tooltip: 'Deactivate',
+                            onPressed: () => _deactivate(member['id'] as int),
+                          ),
+                        ],
                       )
                     : const Text('Inactive', style: TextStyle(color: Colors.grey)),
               );

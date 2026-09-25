@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 
 class ReturnDetailScreen extends StatelessWidget {
   final Map<String, dynamic> item;
+  final String token;
 
-  const ReturnDetailScreen({super.key, required this.item});
+  const ReturnDetailScreen({super.key, required this.item, required this.token});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +54,17 @@ class ReturnDetailScreen extends StatelessWidget {
             _section('Rejection', [
               _row('Reason', (item['rejection_reason'] ?? '—').toString().replaceAll('_', ' ')),
               if ((item['remarks'] ?? '').toString().isNotEmpty) _row('Remarks', item['remarks']),
-              _row('Evidence Photo', item['has_evidence_image'] == true ? 'Attached' : 'Not attached'),
+              if (item['has_evidence_image'] == true)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton.icon(
+                    onPressed: () => _viewEvidenceImage(context),
+                    icon: const Icon(Icons.photo_outlined, size: 18),
+                    label: const Text('View Evidence Photo'),
+                  ),
+                )
+              else
+                _row('Evidence Photo', 'Not attached'),
             ])
           else
             _section('Payment', [
@@ -62,6 +74,35 @@ class ReturnDetailScreen extends StatelessWidget {
               _row('Payment Status', (item['payment_status'] ?? '—').toString().toUpperCase()),
             ]),
         ],
+      ),
+    );
+  }
+
+  void _viewEvidenceImage(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Evidence Photo'), backgroundColor: Colors.black, foregroundColor: Colors.white),
+          backgroundColor: Colors.black,
+          body: Center(
+            child: FutureBuilder(
+              future: ApiService().getEvidenceImage(token, item['id'] as int),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const CircularProgressIndicator(color: Colors.white);
+                }
+                if (snapshot.hasError) {
+                  return Text(
+                    snapshot.error.toString(),
+                    style: const TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  );
+                }
+                return InteractiveViewer(child: Image.memory(snapshot.data!));
+              },
+            ),
+          ),
+        ),
       ),
     );
   }
