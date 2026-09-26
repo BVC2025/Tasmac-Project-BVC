@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'screens/login_screen.dart';
+import 'services/voice_service.dart';
 import 'theme/app_colors.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await VoiceService.instance.loadSavedLanguage();
   runApp(const MyApp());
 }
 

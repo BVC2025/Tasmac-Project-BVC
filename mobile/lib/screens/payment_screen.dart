@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/api_service.dart';
+import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'reject_bottle_screen.dart';
@@ -76,6 +77,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         _step = _PaymentStep.success;
         _result = result;
       });
+      VoiceService.instance.speak(VoiceMessage.paymentSuccess);
     } on ServerUnavailableException {
       _countdownTimer?.cancel();
       if (!mounted) return;
@@ -165,7 +167,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               const SizedBox(height: 28),
               FilledButton.icon(
-                onPressed: () => setState(() => _step = _PaymentStep.scanUpi),
+                onPressed: () {
+                  setState(() => _step = _PaymentStep.scanUpi);
+                  VoiceService.instance.speak(VoiceMessage.showUpi);
+                },
                 icon: const Icon(Icons.qr_code_scanner),
                 label: const Text('Yes — Scan Customer UPI QR'),
               ),

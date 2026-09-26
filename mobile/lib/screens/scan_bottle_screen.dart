@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../services/api_service.dart';
+import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'payment_screen.dart';
 import 'reject_bottle_screen.dart';
@@ -86,6 +87,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
         _longitude = position.longitude;
         _step = _Step.scanManufacturing;
       });
+      VoiceService.instance.speak(VoiceMessage.refundVerified);
     } on ServerUnavailableException {
       setState(() => _step = _Step.serverUnavailable);
     } on ApiException catch (e) {
@@ -119,6 +121,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
         _manufacturingQrCode = code;
         _step = _Step.condition;
       });
+      VoiceService.instance.speak(VoiceMessage.manufacturingVerified);
     } on ServerUnavailableException {
       setState(() => _step = _Step.serverUnavailable);
     } on ApiException catch (e) {

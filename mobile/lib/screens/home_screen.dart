@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'bottle_list_screen.dart';
 import 'login_screen.dart';
@@ -84,6 +85,23 @@ class HomeScreen extends StatelessWidget {
             pinned: true,
             expandedHeight: locationInfo != null ? 220 : 190,
             actions: [
+              PopupMenuButton<VoiceLanguage>(
+                icon: const Icon(Icons.record_voice_over_outlined),
+                tooltip: 'Voice language',
+                onSelected: (language) => VoiceService.instance.setLanguage(language),
+                itemBuilder: (context) => [
+                  CheckedPopupMenuItem(
+                    value: VoiceLanguage.english,
+                    checked: VoiceService.instance.language == VoiceLanguage.english,
+                    child: const Text('Voice: English'),
+                  ),
+                  CheckedPopupMenuItem(
+                    value: VoiceLanguage.tamil,
+                    checked: VoiceService.instance.language == VoiceLanguage.tamil,
+                    child: const Text('Voice: தமிழ்'),
+                  ),
+                ],
+              ),
               IconButton(
                 icon: const Icon(Icons.logout),
                 tooltip: 'Logout',
