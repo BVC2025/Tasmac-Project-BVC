@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_navigator.dart';
 import 'screens/login_screen.dart';
 import 'services/voice_service.dart';
 import 'theme/app_colors.dart';
@@ -16,6 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'TASMAC Bottle Return',
       theme: ThemeData(
         useMaterial3: true,

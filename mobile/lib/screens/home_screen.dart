@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/geofence_monitor.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'bottle_list_screen.dart';
@@ -106,6 +107,7 @@ class HomeScreen extends StatelessWidget {
                 icon: const Icon(Icons.logout),
                 tooltip: 'Logout',
                 onPressed: () {
+                  GeofenceMonitor.instance.stop();
                   Navigator.of(context).pushReplacement(
                     MaterialPageRoute(builder: (_) => const LoginScreen()),
                   );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../app_navigator.dart';
 import '../services/api_service.dart';
+import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
@@ -66,6 +68,7 @@ class _LocationGateScreenState extends State<LocationGateScreen> {
       if (!mounted) return;
 
       if (result['within_range'] == true) {
+        GeofenceMonitor.instance.start(widget.token, appNavigatorKey);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => HomeScreen(user: widget.user, token: widget.token, locationInfo: result),
