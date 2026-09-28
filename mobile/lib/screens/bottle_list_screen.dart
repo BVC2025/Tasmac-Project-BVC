@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../services/api_service.dart';
-import 'generate_bottle_screen.dart';
 
 class BottleListScreen extends StatefulWidget {
   final String token;
@@ -21,12 +20,6 @@ class _BottleListScreenState extends State<BottleListScreen> {
   void initState() {
     super.initState();
     _bottlesFuture = _apiService.listBottles(widget.token);
-  }
-
-  void _refresh() {
-    setState(() {
-      _bottlesFuture = _apiService.listBottles(widget.token);
-    });
   }
 
   Color _statusColor(String status) {
@@ -63,15 +56,6 @@ class _BottleListScreenState extends State<BottleListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final created = await Navigator.of(context).push<bool>(
-            MaterialPageRoute(builder: (_) => GenerateBottleScreen(token: widget.token)),
-          );
-          if (created == true) _refresh();
-        },
-        child: const Icon(Icons.qr_code_2),
-      ),
       body: FutureBuilder<List<dynamic>>(
         future: _bottlesFuture,
         builder: (context, snapshot) {
@@ -84,7 +68,7 @@ class _BottleListScreenState extends State<BottleListScreen> {
 
           final bottles = snapshot.data ?? [];
           if (bottles.isEmpty) {
-            return const Center(child: Text('No bottles generated yet.'));
+            return const Center(child: Text('No bottles provisioned yet.'));
           }
 
           return ListView.separated(

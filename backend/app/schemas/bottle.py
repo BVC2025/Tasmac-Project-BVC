@@ -1,15 +1,6 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.models.bottle import BottleStatus
-
-
-class BottleCreate(BaseModel):
-    brand_name: str | None = None
-
-
-class BulkBottleCreate(BaseModel):
-    count: int = Field(gt=0, le=500)
-    brand_name: str | None = None
 
 
 class BottleOut(BaseModel):

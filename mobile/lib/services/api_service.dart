@@ -257,38 +257,6 @@ class ApiService {
     throw ApiException(_extractError(response.body) ?? 'Could not load bottle list');
   }
 
-  Future<Map<String, dynamic>> createBottle(String token, {String? brandName}) async {
-    final response = await _send(
-      () => http.post(
-        Uri.parse('$baseUrl/bottles'),
-        headers: _jsonHeaders(token),
-        body: jsonEncode({'brand_name': brandName}),
-      ),
-    );
-
-    if (response.statusCode == 201) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
-    }
-
-    throw ApiException(_extractError(response.body) ?? 'Could not generate bottle');
-  }
-
-  Future<List<dynamic>> createBottlesBulk(String token, {required int count, String? brandName}) async {
-    final response = await _send(
-      () => http.post(
-        Uri.parse('$baseUrl/bottles/bulk'),
-        headers: _jsonHeaders(token),
-        body: jsonEncode({'count': count, 'brand_name': brandName}),
-      ),
-    );
-
-    if (response.statusCode == 201) {
-      return jsonDecode(response.body) as List<dynamic>;
-    }
-
-    throw ApiException(_extractError(response.body) ?? 'Could not generate bottles');
-  }
-
   Future<Uint8List> getLabelsPdf(String token, {List<int>? ids}) async {
     final query = ids != null && ids.isNotEmpty ? '?ids=${ids.join(',')}' : '';
     final response = await _send(

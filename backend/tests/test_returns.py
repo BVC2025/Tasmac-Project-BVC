@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from fastapi.testclient import TestClient
 
 import app.api.routes.returns as returns_module
+from app.db.session import SessionLocal
 from app.main import app
+from app.services.bottle_provisioning import new_bottle
 
 client = TestClient(app)
 
@@ -25,11 +27,18 @@ def _login(phone: str, password: str) -> str:
     return response.json()["access_token"]
 
 
-def _generate_bottle(admin_token: str) -> tuple[str, str]:
-    response = client.post("/bottles", json={}, headers={"Authorization": f"Bearer {admin_token}"})
-    assert response.status_code == 201
-    body = response.json()
-    return body["refund_qr_code"], body["manufacturing_qr_code"]
+def _generate_bottle() -> tuple[str, str]:
+    """Bottle creation isn't exposed over the API (see scripts/generate_bottles.py),
+    so tests seed bottles directly."""
+    db = SessionLocal()
+    try:
+        bottle = new_bottle(db)
+        db.add(bottle)
+        db.commit()
+        db.refresh(bottle)
+        return bottle.refund_qr_code, bottle.manufacturing_qr_code
+    finally:
+        db.close()
 
 
 def _seeded_shop_id(admin_token: str) -> int:
@@ -47,7 +56,7 @@ def _force_payment_result(monkeypatch, success: bool):
 def test_verify_refund_qr_success():
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, _ = _generate_bottle(admin_token)
+    refund_qr, _ = _generate_bottle()
 
     response = client.post(
         "/returns/verify-refund-qr",
@@ -71,7 +80,7 @@ def test_verify_refund_qr_unknown_code_404():
 def test_verify_refund_qr_outside_geofence_403():
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, _ = _generate_bottle(admin_token)
+    refund_qr, _ = _generate_bottle()
 
     response = client.post(
         "/returns/verify-refund-qr",
@@ -84,7 +93,7 @@ def test_verify_refund_qr_outside_geofence_403():
 def test_verify_manufacturing_qr_success():
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, mfg_qr = _generate_bottle(admin_token)
+    refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
         "/returns/verify-manufacturing-qr",
@@ -98,8 +107,8 @@ def test_verify_manufacturing_qr_success():
 def test_verify_manufacturing_qr_mismatch():
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, _ = _generate_bottle(admin_token)
-    _, other_mfg_qr = _generate_bottle(admin_token)
+    refund_qr, _ = _generate_bottle()
+    _, other_mfg_qr = _generate_bottle()
 
     response = client.post(
         "/returns/verify-manufacturing-qr",
@@ -113,7 +122,7 @@ def test_complete_return_success(monkeypatch):
     _force_payment_result(monkeypatch, True)
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, mfg_qr = _generate_bottle(admin_token)
+    refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
         "/returns/complete",
@@ -143,7 +152,7 @@ def test_complete_return_payment_failure_does_not_mark_bottle_returned(monkeypat
     _force_payment_result(monkeypatch, False)
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, mfg_qr = _generate_bottle(admin_token)
+    refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
         "/returns/complete",
@@ -168,7 +177,7 @@ def test_complete_return_twice_fails_with_conflict(monkeypatch):
     _force_payment_result(monkeypatch, True)
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, mfg_qr = _generate_bottle(admin_token)
+    refund_qr, mfg_qr = _generate_bottle()
     headers = {"Authorization": f"Bearer {staff_token}"}
     payload = {
         "refund_qr_code": refund_qr,
@@ -189,7 +198,7 @@ def test_complete_return_twice_fails_with_conflict(monkeypatch):
 def test_reject_return_with_reason_and_remarks():
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, _ = _generate_bottle(admin_token)
+    refund_qr, _ = _generate_bottle()
 
     response = client.post(
         "/returns/reject",
@@ -236,7 +245,7 @@ def test_staff_can_list_own_returns(monkeypatch):
     _force_payment_result(monkeypatch, True)
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
     staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
-    refund_qr, mfg_qr = _generate_bottle(admin_token)
+    refund_qr, mfg_qr = _generate_bottle()
 
     client.post(
         "/returns/complete",
@@ -285,7 +294,7 @@ def test_service_time_window_blocks_outside_current_hour():
             headers=admin_headers,
         )
 
-        refund_qr, _ = _generate_bottle(admin_token)
+        refund_qr, _ = _generate_bottle()
         response = client.post(
             "/returns/verify-refund-qr",
             json={"refund_qr_code": refund_qr, "latitude": SHOP_LAT, "longitude": SHOP_LNG},

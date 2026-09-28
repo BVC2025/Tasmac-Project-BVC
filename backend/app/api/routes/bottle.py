@@ -1,5 +1,4 @@
 import io
-import secrets
 
 import qrcode
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -10,65 +9,14 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_admin_user
 from app.db.session import get_db
 from app.models.bottle import Bottle
-from app.schemas.bottle import BottleCreate, BottleOut, BulkBottleCreate
+from app.schemas.bottle import BottleOut
 
 router = APIRouter(prefix="/bottles", tags=["bottles"], dependencies=[Depends(get_current_admin_user)])
-
-REFUND_PREFIX = "TSM-R"
-MANUFACTURING_PREFIX = "TSM-M"
-MAX_GENERATION_ATTEMPTS = 5
-
-
-def _code_in_use(db: Session, candidate: str) -> bool:
-    return (
-        db.query(Bottle).filter(Bottle.refund_qr_code == candidate).first() is not None
-        or db.query(Bottle).filter(Bottle.manufacturing_qr_code == candidate).first() is not None
-    )
-
-
-def _generate_unique_code(db: Session, prefix: str) -> str:
-    for _ in range(MAX_GENERATION_ATTEMPTS):
-        candidate = f"{prefix}-{secrets.token_hex(4)}"
-        if not _code_in_use(db, candidate):
-            return candidate
-    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not generate a unique QR code")
-
-
-def _new_bottle(db: Session, brand_name: str | None) -> Bottle:
-    return Bottle(
-        refund_qr_code=_generate_unique_code(db, REFUND_PREFIX),
-        manufacturing_qr_code=_generate_unique_code(db, MANUFACTURING_PREFIX),
-        brand_name=brand_name,
-    )
 
 
 @router.get("", response_model=list[BottleOut])
 def list_bottles(db: Session = Depends(get_db)):
     return db.query(Bottle).order_by(Bottle.id.desc()).all()
-
-
-@router.post("", response_model=BottleOut, status_code=status.HTTP_201_CREATED)
-def create_bottle(payload: BottleCreate, db: Session = Depends(get_db)):
-    bottle = _new_bottle(db, payload.brand_name)
-    db.add(bottle)
-    db.commit()
-    db.refresh(bottle)
-    return bottle
-
-
-@router.post("/bulk", response_model=list[BottleOut], status_code=status.HTTP_201_CREATED)
-def create_bottles_bulk(payload: BulkBottleCreate, db: Session = Depends(get_db)):
-    bottles = []
-    for _ in range(payload.count):
-        bottle = _new_bottle(db, payload.brand_name)
-        db.add(bottle)
-        db.flush()  # makes this bottle's codes visible to the next uniqueness check
-        bottles.append(bottle)
-
-    db.commit()
-    for bottle in bottles:
-        db.refresh(bottle)
-    return bottles
 
 
 PAGE_SIZE = (2480, 3508)  # A4 at 300 DPI
