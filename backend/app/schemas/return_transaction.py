@@ -37,6 +37,7 @@ class CompleteReturnRequest(BaseModel):
     longitude: float
     payment_method: PaymentMethod
     customer_identifier: str
+    product_barcode: str | None = None
 
 
 class CompleteReturnResponse(BaseModel):
@@ -68,6 +69,7 @@ class ReturnTransactionOut(BaseModel):
     status: ReturnStatus
     rejection_reason: RejectionReason | None
     remarks: str | None
+    product_barcode: str | None
     distance_meters: float | None
     created_at: datetime
     has_evidence_image: bool = False

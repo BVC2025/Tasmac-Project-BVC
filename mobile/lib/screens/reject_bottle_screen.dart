@@ -12,6 +12,7 @@ class RejectBottleScreen extends StatefulWidget {
   final String? refundQrCode;
   final double? latitude;
   final double? longitude;
+  final String? productBarcode;
   final String? initialReason;
 
   const RejectBottleScreen({
@@ -20,6 +21,7 @@ class RejectBottleScreen extends StatefulWidget {
     this.refundQrCode,
     this.latitude,
     this.longitude,
+    this.productBarcode,
     this.initialReason,
   });
 
@@ -69,6 +71,7 @@ class _RejectBottleScreenState extends State<RejectBottleScreen> {
         remarks: _remarksController.text.trim().isEmpty ? null : _remarksController.text.trim(),
         latitude: widget.latitude,
         longitude: widget.longitude,
+        productBarcode: widget.productBarcode,
         evidenceImageBytes: _evidenceBytes,
       );
       if (!mounted) return;

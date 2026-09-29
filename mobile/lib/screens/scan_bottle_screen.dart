@@ -8,7 +8,7 @@ import '../theme/app_colors.dart';
 import 'payment_screen.dart';
 import 'reject_bottle_screen.dart';
 
-enum _Step { scanRefund, busy, scanManufacturing, condition, error, serverUnavailable }
+enum _Step { scanRefund, busy, scanManufacturing, scanBarcode, condition, error, serverUnavailable }
 
 class ScanBottleScreen extends StatefulWidget {
   final String token;
@@ -27,6 +27,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   _Step _step = _Step.scanRefund;
   String? _refundQrCode;
   String? _manufacturingQrCode;
+  String? _productBarcode;
   double? _latitude;
   double? _longitude;
   String? _errorMessage;
@@ -54,18 +55,21 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   // which on some devices leaves the camera preview blank after restart.
   // The `_step` check below is what stops a stray detection mid-verify.
   void _handleDetect(BarcodeCapture capture) {
-    if (_step != _Step.scanRefund && _step != _Step.scanManufacturing) return;
+    if (_step != _Step.scanRefund && _step != _Step.scanManufacturing && _step != _Step.scanBarcode) return;
     if (capture.barcodes.isEmpty) return;
     final code = capture.barcodes.first.rawValue;
     if (code == null) return;
 
+    // The camera stays live across steps — ignore a detection that's just
+    // the previous step's code still sitting in frame.
     if (_step == _Step.scanRefund) {
       _handleRefundDetect(code);
-    } else {
-      // The camera is still pointed at the just-verified refund QR — ignore
-      // it until the user actually moves to the manufacturing QR.
+    } else if (_step == _Step.scanManufacturing) {
       if (code == _refundQrCode) return;
       _handleManufacturingDetect(code);
+    } else {
+      if (code == _refundQrCode || code == _manufacturingQrCode) return;
+      _handleBarcodeDetect(code);
     }
   }
 
@@ -119,7 +123,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       );
       setState(() {
         _manufacturingQrCode = code;
-        _step = _Step.condition;
+        _step = _Step.scanBarcode;
       });
       VoiceService.instance.speak(VoiceMessage.manufacturingVerified);
     } on ServerUnavailableException {
@@ -140,11 +144,22 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     }
   }
 
+  // The product barcode isn't validated against anything server-side — it's
+  // the bottle's existing manufacturer barcode, captured for record-keeping
+  // alongside the refund/manufacturing QR pair.
+  void _handleBarcodeDetect(String code) {
+    setState(() {
+      _productBarcode = code;
+      _step = _Step.condition;
+    });
+  }
+
   void _resetToScanRefund() {
     setState(() {
       _step = _Step.scanRefund;
       _refundQrCode = null;
       _manufacturingQrCode = null;
+      _productBarcode = null;
       _latitude = null;
       _longitude = null;
       _errorMessage = null;
@@ -162,6 +177,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
               manufacturingQrCode: _manufacturingQrCode!,
               latitude: _latitude!,
               longitude: _longitude!,
+              productBarcode: _productBarcode,
               user: widget.user,
             ),
           ),
@@ -178,6 +194,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
               refundQrCode: _refundQrCode,
               latitude: _latitude,
               longitude: _longitude,
+              productBarcode: _productBarcode,
               initialReason: 'bottle_physically_damaged',
             ),
           ),
@@ -194,6 +211,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
               refundQrCode: _refundQrCode,
               latitude: _latitude,
               longitude: _longitude,
+              productBarcode: _productBarcode,
               initialReason: _rejectReasonHint,
             ),
           ),
@@ -220,6 +238,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       case _Step.scanRefund:
       case _Step.busy:
       case _Step.scanManufacturing:
+      case _Step.scanBarcode:
         return _scannerView();
       case _Step.condition:
         return _conditionView();
@@ -231,27 +250,44 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Widget _scannerView() {
-    final onManufacturingStep = _step == _Step.scanManufacturing || _refundQrCode != null;
-    final instruction = onManufacturingStep
-        ? 'Step 2 of 2 — Scan the MANUFACTURING QR code (bottom of bottle)'
-        : 'Step 1 of 2 — Scan the REFUND QR code (top of bottle)';
+    final verifiedBanners = [
+      if (_refundQrCode != null) 'Refund QR verified ✓',
+      if (_manufacturingQrCode != null) 'Manufacturing QR verified ✓',
+    ];
+    final String instruction;
+    if (_manufacturingQrCode != null) {
+      instruction = "Step 3 of 3 — Scan the bottle's PRODUCT BARCODE (label)";
+    } else if (_refundQrCode != null) {
+      instruction = 'Step 2 of 3 — Scan the MANUFACTURING QR code (bottom of bottle)';
+    } else {
+      instruction = 'Step 1 of 3 — Scan the REFUND QR code (top of bottle)';
+    }
 
     return Stack(
       children: [
         MobileScanner(controller: _controller, onDetect: _handleDetect),
-        if (onManufacturingStep)
+        if (verifiedBanners.isNotEmpty)
           Positioned(
             top: 16,
             left: 16,
             right: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-              decoration: BoxDecoration(color: Colors.green.shade700, borderRadius: BorderRadius.circular(10)),
-              child: const Text(
-                'Refund QR verified ✓',
-                style: TextStyle(color: Colors.white),
-                textAlign: TextAlign.center,
-              ),
+            child: Column(
+              children: [
+                for (final banner in verifiedBanners)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(color: Colors.green.shade700, borderRadius: BorderRadius.circular(10)),
+                      child: Text(
+                        banner,
+                        style: const TextStyle(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         if (_step == _Step.busy)
@@ -287,7 +323,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
             children: [
               const Icon(Icons.fact_check_outlined, size: 56, color: AppColors.primaryGreen),
               const SizedBox(height: 12),
-              const Text('Both QR codes verified ✓', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
+              const Text('QR codes and barcode verified ✓', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
               const Text(
                 'Check the physical bottle condition',

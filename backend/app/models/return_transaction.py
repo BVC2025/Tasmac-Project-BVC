@@ -43,6 +43,7 @@ class ReturnTransaction(TimestampMixin, Base):
     )
     evidence_image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    product_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     bottle: Mapped["Bottle"] = relationship(back_populates="return_transactions")
     shop: Mapped["Shop"] = relationship(back_populates="return_transactions")

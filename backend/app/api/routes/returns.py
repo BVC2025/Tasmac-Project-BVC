@@ -100,6 +100,7 @@ def _to_out(transaction: ReturnTransaction) -> ReturnTransactionOut:
         status=transaction.status,
         rejection_reason=transaction.rejection_reason,
         remarks=transaction.remarks,
+        product_barcode=transaction.product_barcode,
         distance_meters=distance,
         created_at=transaction.created_at,
         has_evidence_image=transaction.evidence_image_path is not None,
@@ -204,6 +205,7 @@ def complete_return(
         status=ReturnStatus.VERIFIED if payment_success else ReturnStatus.PENDING,
         latitude=payload.latitude,
         longitude=payload.longitude,
+        product_barcode=payload.product_barcode,
     )
     db.add(transaction)
     db.flush()
@@ -255,6 +257,7 @@ async def reject_return(
     remarks: str | None = Form(default=None),
     latitude: float | None = Form(default=None),
     longitude: float | None = Form(default=None),
+    product_barcode: str | None = Form(default=None),
     evidence_image: UploadFile | None = File(default=None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -279,6 +282,7 @@ async def reject_return(
         rejection_reason=reason,
         evidence_image_path=evidence_path,
         remarks=remarks,
+        product_barcode=product_barcode,
     )
     db.add(transaction)
     db.flush()

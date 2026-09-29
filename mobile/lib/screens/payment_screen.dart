@@ -17,6 +17,7 @@ class PaymentScreen extends StatefulWidget {
   final String manufacturingQrCode;
   final double latitude;
   final double longitude;
+  final String? productBarcode;
   final Map<String, dynamic> user;
 
   const PaymentScreen({
@@ -26,6 +27,7 @@ class PaymentScreen extends StatefulWidget {
     required this.manufacturingQrCode,
     required this.latitude,
     required this.longitude,
+    this.productBarcode,
     required this.user,
   });
 
@@ -70,6 +72,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         longitude: widget.longitude,
         paymentMethod: method,
         customerIdentifier: customerIdentifier,
+        productBarcode: widget.productBarcode,
       );
       _countdownTimer?.cancel();
       if (!mounted) return;
@@ -369,6 +372,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         refundQrCode: widget.refundQrCode,
                         latitude: widget.latitude,
                         longitude: widget.longitude,
+                        productBarcode: widget.productBarcode,
                         initialReason: 'other',
                       ),
                     ),

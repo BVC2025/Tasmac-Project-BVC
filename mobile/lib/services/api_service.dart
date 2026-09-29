@@ -294,6 +294,7 @@ class ApiService {
     required double longitude,
     required String paymentMethod,
     required String customerIdentifier,
+    String? productBarcode,
   }) async {
     final response = await _send(
       () => http.post(
@@ -306,6 +307,7 @@ class ApiService {
           'longitude': longitude,
           'payment_method': paymentMethod,
           'customer_identifier': customerIdentifier,
+          'product_barcode': productBarcode,
         }),
       ),
       timeout: _paymentTimeout,
@@ -325,6 +327,7 @@ class ApiService {
     String? remarks,
     double? latitude,
     double? longitude,
+    String? productBarcode,
     Uint8List? evidenceImageBytes,
   }) async {
     final uri = Uri.parse('$baseUrl/returns/reject');
@@ -336,6 +339,7 @@ class ApiService {
     if (remarks != null && remarks.isNotEmpty) request.fields['remarks'] = remarks;
     if (latitude != null) request.fields['latitude'] = latitude.toString();
     if (longitude != null) request.fields['longitude'] = longitude.toString();
+    if (productBarcode != null) request.fields['product_barcode'] = productBarcode;
     if (evidenceImageBytes != null) {
       request.files.add(http.MultipartFile.fromBytes('evidence_image', evidenceImageBytes, filename: 'evidence.jpg'));
     }
