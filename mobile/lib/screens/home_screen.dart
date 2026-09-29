@@ -4,7 +4,8 @@ import '../services/geofence_monitor.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'login_screen.dart';
-import 'my_returns_screen.dart';
+import 'refund_history_screen.dart';
+import 'reject_history_screen.dart';
 import 'scan_bottle_screen.dart';
 import 'shop_list_screen.dart';
 import 'staff_list_screen.dart';
@@ -61,11 +62,18 @@ class HomeScreen extends StatelessWidget {
           builder: (_) => ScanBottleScreen(token: token, user: user),
         ),
         _Action(
-          label: 'My Returns',
-          subtitle: 'Returns you have processed',
-          icon: Icons.history,
+          label: 'Refund',
+          subtitle: 'Successful returns',
+          icon: Icons.check_circle_outline,
           color: const Color(0xFF1B4332),
-          builder: (_) => MyReturnsScreen(token: token),
+          builder: (_) => RefundHistoryScreen(token: token),
+        ),
+        _Action(
+          label: 'Reject',
+          subtitle: 'Rejected returns & reasons',
+          icon: Icons.cancel_outlined,
+          color: const Color(0xFF6B2C2C),
+          builder: (_) => RejectHistoryScreen(token: token),
         ),
       ],
     ];

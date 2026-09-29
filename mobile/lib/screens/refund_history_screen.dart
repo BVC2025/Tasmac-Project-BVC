@@ -1,31 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../theme/app_colors.dart';
 import 'return_detail_screen.dart';
 
-class MyReturnsScreen extends StatefulWidget {
+/// Successful returns only — rejected ones live in [RejectHistoryScreen].
+class RefundHistoryScreen extends StatefulWidget {
   final String token;
 
-  const MyReturnsScreen({super.key, required this.token});
+  const RefundHistoryScreen({super.key, required this.token});
 
   @override
-  State<MyReturnsScreen> createState() => _MyReturnsScreenState();
+  State<RefundHistoryScreen> createState() => _RefundHistoryScreenState();
 }
 
-class _MyReturnsScreenState extends State<MyReturnsScreen> {
+class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
   final _apiService = ApiService();
   late Future<List<dynamic>> _returnsFuture;
 
   @override
   void initState() {
     super.initState();
-    _returnsFuture = _apiService.listMyReturns(widget.token);
+    _returnsFuture = _load();
+  }
+
+  Future<List<dynamic>> _load() async {
+    final all = await _apiService.listMyReturns(widget.token);
+    return all.where((item) => (item as Map<String, dynamic>)['status'] != 'rejected').toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Returns')),
+      appBar: AppBar(title: const Text('Refund')),
       body: FutureBuilder<List<dynamic>>(
         future: _returnsFuture,
         builder: (context, snapshot) {
@@ -38,7 +45,7 @@ class _MyReturnsScreenState extends State<MyReturnsScreen> {
 
           final returns = snapshot.data ?? [];
           if (returns.isEmpty) {
-            return const Center(child: Text('No returns processed yet.'));
+            return const Center(child: Text('No refunds processed yet.'));
           }
 
           return ListView.separated(
@@ -46,27 +53,19 @@ class _MyReturnsScreenState extends State<MyReturnsScreen> {
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final item = returns[index] as Map<String, dynamic>;
-              final status = item['status'] as String;
-              final isRejected = status == 'rejected';
               final createdAt = DateTime.tryParse(item['created_at']?.toString() ?? '')?.toLocal();
 
               return ListTile(
-                leading: Icon(
-                  isRejected ? Icons.cancel : Icons.check_circle,
-                  color: isRejected ? Colors.red : Colors.green,
-                ),
+                leading: const Icon(Icons.check_circle, color: Colors.green),
                 title: Text(item['qr_code'] ?? 'Unknown bottle'),
                 subtitle: Text(
-                  isRejected
-                      ? 'Rejected: ${item['rejection_reason'] ?? ''}'
-                      : '${item['shop_name']} • ${item['distance_meters'] ?? '—'} m',
+                  '${item['shop_name']} • ₹${item['payment_amount'] ?? '10'}',
                 ),
                 trailing: Text(
                   createdAt != null ? '${_shortDate(createdAt)}\n${_shortTime(createdAt)}' : '',
                   textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 11),
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                 ),
-                isThreeLine: false,
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => ReturnDetailScreen(item: item, token: widget.token)),
                 ),
