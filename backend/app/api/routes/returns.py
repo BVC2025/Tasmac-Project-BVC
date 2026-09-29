@@ -20,6 +20,8 @@ from app.schemas.return_transaction import (
     CompleteReturnBatchResponse,
     CompleteReturnRequest,
     CompleteReturnResponse,
+    LookupManufacturingQrRequest,
+    LookupManufacturingQrResponse,
     RejectReturnResponse,
     ReturnTransactionOut,
     VerifyManufacturingQrRequest,
@@ -180,6 +182,23 @@ def verify_manufacturing_qr(
     db.commit()
 
     return VerifyManufacturingQrResponse(valid=True, bottle_id=bottle.id)
+
+
+@router.post("/lookup-manufacturing-qr", response_model=LookupManufacturingQrResponse)
+def lookup_manufacturing_qr(
+    payload: LookupManufacturingQrRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Identifies which bottle a manufacturing QR belongs to, without needing
+    its refund QR up front — used by the bulk-scan flow's manufacturing round,
+    where bottles are matched by scanning manufacturing QRs against a batch of
+    already-verified refund QRs rather than one bottle at a time."""
+    bottle = db.query(Bottle).filter(Bottle.manufacturing_qr_code == payload.manufacturing_qr_code).first()
+    if bottle is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Manufacturing QR code not recognized")
+
+    return LookupManufacturingQrResponse(bottle_id=bottle.id, refund_qr_code=bottle.refund_qr_code)
 
 
 @router.post("/complete", response_model=CompleteReturnResponse, status_code=status.HTTP_201_CREATED)

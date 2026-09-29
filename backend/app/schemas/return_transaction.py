@@ -30,6 +30,15 @@ class VerifyManufacturingQrResponse(BaseModel):
     bottle_id: int
 
 
+class LookupManufacturingQrRequest(BaseModel):
+    manufacturing_qr_code: str
+
+
+class LookupManufacturingQrResponse(BaseModel):
+    bottle_id: int
+    refund_qr_code: str
+
+
 class CompleteReturnRequest(BaseModel):
     refund_qr_code: str
     manufacturing_qr_code: str

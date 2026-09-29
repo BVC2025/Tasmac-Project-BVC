@@ -118,6 +118,30 @@ def test_verify_manufacturing_qr_mismatch():
     assert response.status_code == 400
 
 
+def test_lookup_manufacturing_qr_success():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    refund_qr, mfg_qr = _generate_bottle()
+
+    response = client.post(
+        "/returns/lookup-manufacturing-qr",
+        json={"manufacturing_qr_code": mfg_qr},
+        headers={"Authorization": f"Bearer {staff_token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["refund_qr_code"] == refund_qr
+
+
+def test_lookup_manufacturing_qr_unknown_code_404():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+
+    response = client.post(
+        "/returns/lookup-manufacturing-qr",
+        json={"manufacturing_qr_code": "TSM-M-doesnotexist"},
+        headers={"Authorization": f"Bearer {staff_token}"},
+    )
+    assert response.status_code == 404
+
+
 def test_complete_return_success(monkeypatch):
     _force_payment_result(monkeypatch, True)
     admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)

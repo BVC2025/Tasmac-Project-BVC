@@ -286,6 +286,28 @@ class ApiService {
     throw ApiException(_extractError(response.body) ?? 'Could not verify manufacturing QR');
   }
 
+  /// Identifies which bottle a manufacturing QR belongs to (by its refund QR
+  /// code), without needing to already know which bottle to check against —
+  /// used by the bulk-scan flow's manufacturing round.
+  Future<Map<String, dynamic>> lookupManufacturingQr(
+    String token, {
+    required String manufacturingQrCode,
+  }) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/returns/lookup-manufacturing-qr'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({'manufacturing_qr_code': manufacturingQrCode}),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_extractError(response.body) ?? 'Manufacturing QR code not recognized');
+  }
+
   Future<Map<String, dynamic>> completeReturn(
     String token, {
     required String refundQrCode,
