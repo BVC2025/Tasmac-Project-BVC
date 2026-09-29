@@ -245,47 +245,6 @@ class ApiService {
     throw ApiException(_extractError(response.body) ?? 'Could not verify location');
   }
 
-  Future<List<dynamic>> listBottles(String token) async {
-    final response = await _send(
-      () => http.get(Uri.parse('$baseUrl/bottles'), headers: _authHeaders(token)),
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body) as List<dynamic>;
-    }
-
-    throw ApiException(_extractError(response.body) ?? 'Could not load bottle list');
-  }
-
-  Future<Uint8List> getLabelsPdf(String token, {List<int>? ids}) async {
-    final query = ids != null && ids.isNotEmpty ? '?ids=${ids.join(',')}' : '';
-    final response = await _send(
-      () => http.get(Uri.parse('$baseUrl/bottles/labels-pdf$query'), headers: _authHeaders(token)),
-    );
-
-    if (response.statusCode == 200) {
-      return response.bodyBytes;
-    }
-
-    throw ApiException(_extractError(response.body) ?? 'Could not load labels PDF');
-  }
-
-  Future<Uint8List> getRefundQrImage(String token, int bottleId) async {
-    final response = await _send(
-      () => http.get(Uri.parse('$baseUrl/bottles/$bottleId/qr/refund'), headers: _authHeaders(token)),
-    );
-    if (response.statusCode == 200) return response.bodyBytes;
-    throw ApiException('Could not load refund QR image');
-  }
-
-  Future<Uint8List> getManufacturingQrImage(String token, int bottleId) async {
-    final response = await _send(
-      () => http.get(Uri.parse('$baseUrl/bottles/$bottleId/qr/manufacturing'), headers: _authHeaders(token)),
-    );
-    if (response.statusCode == 200) return response.bodyBytes;
-    throw ApiException('Could not load manufacturing QR image');
-  }
-
   Future<Map<String, dynamic>> verifyRefundQr(
     String token, {
     required String refundQrCode,

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../services/geofence_monitor.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
-import 'bottle_list_screen.dart';
 import 'login_screen.dart';
 import 'my_returns_screen.dart';
 import 'scan_bottle_screen.dart';
@@ -53,28 +52,22 @@ class HomeScreen extends StatelessWidget {
           color: const Color(0xFF40916C),
           builder: (_) => ShopListScreen(token: token),
         ),
+      ] else ...[
         _Action(
-          label: 'Manage Bottles',
-          subtitle: 'Generate & print QR codes',
-          icon: Icons.qr_code_2,
-          color: const Color(0xFF52B788),
-          builder: (_) => BottleListScreen(token: token),
+          label: 'Scan Bottle',
+          subtitle: 'Verify a return with the camera',
+          icon: Icons.qr_code_scanner,
+          color: AppColors.brandRed,
+          builder: (_) => ScanBottleScreen(token: token, user: user),
+        ),
+        _Action(
+          label: 'My Returns',
+          subtitle: 'Returns you have processed',
+          icon: Icons.history,
+          color: const Color(0xFF1B4332),
+          builder: (_) => MyReturnsScreen(token: token),
         ),
       ],
-      _Action(
-        label: 'Scan Bottle',
-        subtitle: 'Verify a return with the camera',
-        icon: Icons.qr_code_scanner,
-        color: AppColors.brandRed,
-        builder: (_) => ScanBottleScreen(token: token, user: user),
-      ),
-      _Action(
-        label: 'My Returns',
-        subtitle: 'Returns you have processed',
-        icon: Icons.history,
-        color: const Color(0xFF1B4332),
-        builder: (_) => MyReturnsScreen(token: token),
-      ),
     ];
 
     return Scaffold(
