@@ -8,8 +8,9 @@ import '../services/api_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'batch_payment_screen.dart';
+import 'reject_bottle_screen.dart';
 
-/// One bottle's final outcome from the batch-scan loop below.
+/// One bottle's outcome from the batch-scan loop below.
 class ScannedBottle {
   final String refundQrCode;
   final String? manufacturingQrCode;
@@ -26,28 +27,11 @@ class ScannedBottle {
   });
 }
 
-/// A bottle's mutable working state as it moves through the three scanning
-/// rounds below: its refund QR is scanned first (round 1, for every bottle in
-/// the batch in one continuous pass), then its manufacturing QR is matched
-/// (round 2, also one continuous pass), then finally its physical condition
-/// is checked (round 3) before the summary.
-class _WorkingBottle {
-  final String refundQrCode;
-  final bool refundValid;
-  String? rejectReason;
-  String? manufacturingQrCode;
-  String? productBarcode;
-  bool manufacturingMatched = false;
-  bool? conditionGood;
+enum _Phase { selectCount, scanning, summary }
 
-  _WorkingBottle({
-    required this.refundQrCode,
-    required this.refundValid,
-    this.rejectReason,
-  });
-}
-
-enum _Phase { selectCount, refundRound, manufacturingRound, conditionRound, summary }
+// Within the scanning phase, each bottle goes refund -> second (manufacturing
+// QR or, if the bottle has none, its plain product barcode) -> condition.
+enum _ScanStep { refund, second, condition, busy }
 
 class ScanBottleScreen extends StatefulWidget {
   final String token;
@@ -65,18 +49,17 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
 
   _Phase _phase = _Phase.selectCount;
   int _targetCount = 5;
-  bool _busy = false;
+
+  _ScanStep _scanStep = _ScanStep.refund;
+  String? _pendingRefundCode;
+  String? _pendingManufacturingCode;
+  String? _pendingBarcode;
+  bool _secondIsBarcodeMode = false;
   String? _lastIgnoredCode;
   double? _latitude;
   double? _longitude;
 
-  final List<_WorkingBottle> _batch = [];
-  List<_WorkingBottle> _conditionQueue = [];
-  int _conditionIndex = 0;
-  _WorkingBottle? _barcodeTarget;
-
-  List<_WorkingBottle> get _pendingManufacturing =>
-      _batch.where((b) => b.refundValid && !b.manufacturingMatched).toList();
+  final List<ScannedBottle> _results = [];
 
   // The whole batch is scanned from one spot at the counter, so the GPS fix
   // only needs to happen once per session — every bottle after the first
@@ -110,229 +93,173 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   void _startScanning(int count) {
     setState(() {
       _targetCount = count;
-      _phase = _Phase.refundRound;
+      _phase = _Phase.scanning;
     });
   }
 
-  void _showSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _bestEffortReject(String refundQrCode, String reason) async {
-    try {
-      await _apiService.rejectReturn(
-        widget.token,
-        reason: reason,
-        refundQrCode: refundQrCode,
-        latitude: _latitude,
-        longitude: _longitude,
-      );
-    } catch (_) {
-      // Logging the rejection is best-effort — the bottle still shows as
-      // rejected in this session's summary either way.
-    }
-  }
-
-  // --- Round 1: refund QR, one continuous pass over the whole batch -------
-
-  void _handleRefundRoundDetect(BarcodeCapture capture) {
-    if (_busy) return;
+  void _handleDetect(BarcodeCapture capture) {
+    if (_scanStep == _ScanStep.busy) return;
     if (capture.barcodes.isEmpty) return;
     final code = capture.barcodes.first.rawValue;
     if (code == null) return;
-    if (_batch.any((b) => b.refundQrCode == code)) return; // already recorded
 
-    _handleRefundScan(code);
+    if (_scanStep == _ScanStep.refund) {
+      _handleRefundDetect(code);
+    } else if (_scanStep == _ScanStep.second) {
+      if (code == _pendingRefundCode) return; // still the same code in frame
+      _handleSecondDetect(code);
+    }
   }
 
-  Future<void> _handleRefundScan(String code) async {
-    setState(() => _busy = true);
+  Future<void> _handleRefundDetect(String code) async {
+    setState(() => _scanStep = _ScanStep.busy);
 
     try {
       await _ensureLocation();
+
       await _apiService.verifyRefundQr(
         widget.token,
         refundQrCode: code,
         latitude: _latitude!,
         longitude: _longitude!,
       );
+
       setState(() {
-        _batch.add(_WorkingBottle(refundQrCode: code, refundValid: true));
-        _busy = false;
+        _pendingRefundCode = code;
+        _scanStep = _ScanStep.second;
       });
       VoiceService.instance.speak(VoiceMessage.refundVerified);
     } on ServerUnavailableException {
       _showSnack('Server unavailable — try scanning this bottle again.');
-      setState(() => _busy = false);
-      return;
+      setState(() => _scanStep = _ScanStep.refund);
     } on ApiException catch (e) {
+      // Scanning the wrong or an already-used QR is a scan mistake, not a
+      // customer decision — it's recorded in this session's summary only,
+      // never sent to the backend as a real rejection.
       final message = e.toString();
       final reason = message.toLowerCase().contains('already been') ? 'qr_already_used' : 'refund_qr_invalid';
-      setState(() {
-        _batch.add(_WorkingBottle(refundQrCode: code, refundValid: false, rejectReason: reason));
-        _busy = false;
-      });
-      await _bestEffortReject(code, reason);
+      _finishBottle(ScannedBottle(refundQrCode: code, isValid: false, rejectReason: reason));
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''));
-      setState(() => _busy = false);
+      setState(() => _scanStep = _ScanStep.refund);
+    }
+  }
+
+  // The bottle's own product barcode is only accepted after staff explicitly
+  // taps "No manufacturing QR" below — never auto-detected — so a stray code
+  // from a neighbouring bottle still in the camera frame can't silently hijack
+  // this step. Absent that, any code not starting with our manufacturing-QR
+  // prefix is flagged (once, not every frame) and the camera keeps waiting
+  // for the real one — never silently ignored, so staff who scan the wrong
+  // bottle or jump ahead see why nothing happened.
+  Future<void> _handleSecondDetect(String code) async {
+    if (_secondIsBarcodeMode) {
+      setState(() {
+        _pendingBarcode = code;
+        _secondIsBarcodeMode = false;
+        _scanStep = _ScanStep.condition;
+      });
       return;
     }
 
-    if (_batch.length >= _targetCount) _finishRefundRound();
-  }
-
-  void _finishRefundRound() {
-    setState(() => _phase = _Phase.manufacturingRound);
-    if (_pendingManufacturing.isEmpty) _finishManufacturingRound();
-  }
-
-  // --- Round 2: manufacturing QR, matched against round 1's batch ---------
-
-  void _handleManufacturingRoundDetect(BarcodeCapture capture) {
-    if (_busy) return;
-    if (capture.barcodes.isEmpty) return;
-    final code = capture.barcodes.first.rawValue;
-    if (code == null) return;
-    if (_batch.any((b) => b.manufacturingQrCode == code)) return; // already matched
-
-    _handleManufacturingScan(code);
-  }
-
-  Future<void> _handleManufacturingScan(String code) async {
-    if (_barcodeTarget != null) {
-      final target = _barcodeTarget!;
-      setState(() {
-        target.productBarcode = code;
-        target.manufacturingMatched = true;
-        _barcodeTarget = null;
-      });
-      if (_pendingManufacturing.isEmpty) _finishManufacturingRound();
-      return;
-    }
-
-    setState(() => _busy = true);
-
-    try {
-      final result = await _apiService.lookupManufacturingQr(widget.token, manufacturingQrCode: code);
-      final refundCode = result['refund_qr_code'] as String;
-
-      _WorkingBottle? match;
-      for (final b in _batch) {
-        if (b.refundQrCode == refundCode && b.refundValid && !b.manufacturingMatched) {
-          match = b;
-          break;
-        }
-      }
-
-      if (match == null) {
-        setState(() => _busy = false);
-        if (code != _lastIgnoredCode) {
-          _lastIgnoredCode = code;
-          _showSnack("This manufacturing QR doesn't match any pending bottle in this batch.");
-        }
-        return;
-      }
-
-      setState(() {
-        match!.manufacturingQrCode = code;
-        match.manufacturingMatched = true;
-        _busy = false;
-        _lastIgnoredCode = null;
-      });
-      VoiceService.instance.speak(VoiceMessage.manufacturingVerified);
-      if (_pendingManufacturing.isEmpty) _finishManufacturingRound();
-    } on ServerUnavailableException {
-      _showSnack('Server unavailable — try scanning this code again.');
-      setState(() => _busy = false);
-    } on ApiException {
-      setState(() => _busy = false);
+    if (!code.startsWith('TSM-M-')) {
       if (code != _lastIgnoredCode) {
         _lastIgnoredCode = code;
-        _showSnack('Unrecognized manufacturing QR.');
+        _showSnack("That's not this bottle's manufacturing QR. Scan the MANUFACTURING QR of the bottle you just verified — or tap \"No Manufacturing QR\" below.");
       }
+      return;
+    }
+    _lastIgnoredCode = null;
+
+    setState(() => _scanStep = _ScanStep.busy);
+
+    try {
+      await _apiService.verifyManufacturingQr(
+        widget.token,
+        refundQrCode: _pendingRefundCode!,
+        manufacturingQrCode: code,
+      );
+      setState(() {
+        _pendingManufacturingCode = code;
+        _scanStep = _ScanStep.condition;
+      });
+      VoiceService.instance.speak(VoiceMessage.manufacturingVerified);
+    } on ServerUnavailableException {
+      _showSnack('Server unavailable — try scanning this bottle again.');
+      setState(() => _scanStep = _ScanStep.second);
+    } on ApiException {
+      // Same as an invalid refund QR: a mismatched code is a scan mistake,
+      // recorded locally only — not sent to the backend as a rejection.
+      _finishBottle(ScannedBottle(
+        refundQrCode: _pendingRefundCode!,
+        isValid: false,
+        rejectReason: 'manufacturing_qr_invalid',
+      ));
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''));
-      setState(() => _busy = false);
+      setState(() => _scanStep = _ScanStep.second);
     }
   }
 
-  Future<void> _pickBarcodeTarget() async {
-    final pending = _pendingManufacturing;
-    final chosen = await showModalBottomSheet<_WorkingBottle>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Which bottle has no manufacturing QR?', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            for (final b in pending)
-              ListTile(
-                title: Text('Bottle ${_batch.indexOf(b) + 1}'),
-                subtitle: Text(b.refundQrCode),
-                onTap: () => Navigator.of(context).pop(b),
-              ),
-          ],
+  Future<void> _condition(bool isGood) async {
+    if (isGood) {
+      _finishBottle(ScannedBottle(
+        refundQrCode: _pendingRefundCode!,
+        manufacturingQrCode: _pendingManufacturingCode,
+        productBarcode: _pendingBarcode,
+        isValid: true,
+      ));
+      return;
+    }
+
+    // A physically damaged bottle is a genuine, staff-confirmed rejection —
+    // unlike a bad scan, this one needs a reason, remarks, and evidence photo
+    // and is submitted straight to the backend from that screen.
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RejectBottleScreen(
+          token: widget.token,
+          refundQrCode: _pendingRefundCode,
+          latitude: _latitude,
+          longitude: _longitude,
+          productBarcode: _pendingBarcode,
+          initialReason: 'bottle_physically_damaged',
         ),
       ),
     );
-    if (chosen != null) setState(() => _barcodeTarget = chosen);
+    if (submitted != true) return; // staff backed out — stay on this bottle
+
+    _finishBottle(ScannedBottle(
+      refundQrCode: _pendingRefundCode!,
+      isValid: false,
+      rejectReason: 'bottle_physically_damaged',
+    ));
   }
 
-  Future<void> _finishManufacturingRoundEarly() async {
-    for (final b in _pendingManufacturing) {
-      b.rejectReason = 'manufacturing_qr_invalid';
-      await _bestEffortReject(b.refundQrCode, 'manufacturing_qr_invalid');
-    }
-    _finishManufacturingRound();
-  }
-
-  void _finishManufacturingRound() {
+  void _finishBottle(ScannedBottle result) {
     setState(() {
-      _conditionQueue = _batch.where((b) => b.refundValid && b.manufacturingMatched).toList();
-      _conditionIndex = 0;
-      _phase = _Phase.conditionRound;
+      _results.add(result);
+      _pendingRefundCode = null;
+      _pendingManufacturingCode = null;
+      _pendingBarcode = null;
+      _secondIsBarcodeMode = false;
+      _lastIgnoredCode = null;
+      _scanStep = _ScanStep.refund;
     });
-    if (_conditionQueue.isEmpty) _goToSummary();
-  }
 
-  // --- Round 3: physical condition check, one bottle at a time ------------
-
-  Future<void> _condition(bool isGood) async {
-    final bottle = _conditionQueue[_conditionIndex];
-    bottle.conditionGood = isGood;
-    if (!isGood) {
-      await _bestEffortReject(bottle.refundQrCode, 'bottle_physically_damaged');
+    if (_results.length >= _targetCount) {
+      _goToSummary();
     }
-    setState(() => _conditionIndex++);
-    if (_conditionIndex >= _conditionQueue.length) _goToSummary();
   }
 
   void _goToSummary() {
     setState(() => _phase = _Phase.summary);
   }
 
-  List<ScannedBottle> get _results => _batch.map((b) {
-        if (!b.refundValid) {
-          return ScannedBottle(refundQrCode: b.refundQrCode, isValid: false, rejectReason: b.rejectReason);
-        }
-        if (!b.manufacturingMatched) {
-          return ScannedBottle(refundQrCode: b.refundQrCode, isValid: false, rejectReason: 'manufacturing_qr_invalid');
-        }
-        if (b.conditionGood == false) {
-          return ScannedBottle(refundQrCode: b.refundQrCode, isValid: false, rejectReason: 'bottle_physically_damaged');
-        }
-        return ScannedBottle(
-          refundQrCode: b.refundQrCode,
-          manufacturingQrCode: b.manufacturingQrCode,
-          productBarcode: b.productBarcode,
-          isValid: true,
-        );
-      }).toList();
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
 
   void _proceedToPayment() {
     final validBottles = _results.where((b) => b.isValid).toList();
@@ -363,9 +290,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       appBar: AppBar(title: Text(_titleFor(_phase))),
       body: switch (_phase) {
         _Phase.selectCount => _CountSelectView(onStart: _startScanning),
-        _Phase.refundRound => _buildRefundRoundView(),
-        _Phase.manufacturingRound => _buildManufacturingRoundView(),
-        _Phase.conditionRound => _conditionView(),
+        _Phase.scanning => _buildScanningView(),
         _Phase.summary => _buildSummaryView(),
       },
     );
@@ -373,94 +298,60 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
 
   String _titleFor(_Phase phase) => switch (phase) {
         _Phase.selectCount => 'Scan Bottle to Return',
-        _Phase.refundRound => 'Refund QR — ${_batch.length} of $_targetCount',
-        _Phase.manufacturingRound =>
-          'Manufacturing QR — ${_batch.where((b) => b.refundValid).length - _pendingManufacturing.length} of ${_batch.where((b) => b.refundValid).length}',
-        _Phase.conditionRound => 'Condition Check',
+        _Phase.scanning => 'Scanning — ${_results.length} of $_targetCount',
         _Phase.summary => 'Scan Summary',
       };
 
-  Widget _buildRefundRoundView() {
-    final valid = _batch.where((b) => b.refundValid).length;
-    final rejected = _batch.where((b) => !b.refundValid).length;
+  Widget _buildScanningView() {
+    if (_scanStep == _ScanStep.condition) {
+      return _conditionView();
+    }
+
+    final verifiedBanners = [
+      if (_pendingRefundCode != null) 'Refund QR verified ✓',
+    ];
+    final String instruction;
+    if (_scanStep == _ScanStep.second) {
+      instruction = _secondIsBarcodeMode
+          ? 'Scan the bottle\'s BARCODE'
+          : 'Scan the MANUFACTURING QR of this same bottle';
+    } else {
+      instruction = 'Scan the REFUND QR code (top of bottle)';
+    }
 
     return Stack(
       children: [
-        MobileScanner(controller: _controller, onDetect: _handleRefundRoundDetect),
+        MobileScanner(controller: _controller, onDetect: _handleDetect),
         Positioned(
           top: 16,
           left: 16,
           right: 16,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
-            child: Text(
-              'Scanned ${_batch.length} of $_targetCount  •  $valid valid  •  $rejected rejected',
-              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        if (_busy)
-          Container(
-            color: Colors.black45,
-            child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-          ),
-        Align(
-          alignment: Alignment.bottomCenter,
-          child: Container(
-            width: double.infinity,
-            color: Colors.black54,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Scan the REFUND QR code (top of bottle) — one bottle after another',
-                  style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
+                decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
+                child: Text(
+                  'Bottle ${_results.length + 1} of $_targetCount  •  ${_results.where((b) => b.isValid).length} valid  •  ${_results.where((b) => !b.isValid).length} rejected',
+                  style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
-                if (_batch.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
-                    onPressed: _finishRefundRound,
-                    child: const Text('Done Scanning Refund QRs'),
+              ),
+              for (final banner in verifiedBanners)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                    decoration: BoxDecoration(color: Colors.green.shade700, borderRadius: BorderRadius.circular(10)),
+                    child: Text(banner, style: const TextStyle(color: Colors.white), textAlign: TextAlign.center),
                   ),
-                ],
-              ],
-            ),
+                ),
+            ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildManufacturingRoundView() {
-    final pending = _pendingManufacturing;
-    final matched = _batch.where((b) => b.refundValid).length - pending.length;
-    final total = _batch.where((b) => b.refundValid).length;
-
-    return Stack(
-      children: [
-        MobileScanner(controller: _controller, onDetect: _handleManufacturingRoundDetect),
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 14),
-            decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(10)),
-            child: Text(
-              'Matched $matched of $total',
-              style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        if (_busy)
+        if (_scanStep == _ScanStep.busy)
           Container(
             color: Colors.black45,
             child: const Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -475,24 +366,24 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  _barcodeTarget != null
-                      ? "Scan Bottle ${_batch.indexOf(_barcodeTarget!) + 1}'s BARCODE"
-                      : 'Scan the MANUFACTURING QR — any order',
+                  instruction,
                   style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
-                if (_barcodeTarget == null) ...[
+                if (_scanStep == _ScanStep.second && !_secondIsBarcodeMode) ...[
                   const SizedBox(height: 12),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
-                    onPressed: _pickBarcodeTarget,
+                    onPressed: () => setState(() => _secondIsBarcodeMode = true),
                     child: const Text('No Manufacturing QR — Scan Barcode'),
                   ),
+                ],
+                if (_results.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
-                    onPressed: _finishManufacturingRoundEarly,
-                    child: const Text('Finish Matching'),
+                    onPressed: _goToSummary,
+                    child: const Text('Finish Now'),
                   ),
                 ],
               ],
@@ -504,8 +395,6 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Widget _conditionView() {
-    final position = _conditionIndex + 1;
-    final total = _conditionQueue.length;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 380),
@@ -517,7 +406,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
               const Icon(Icons.fact_check_outlined, size: 56, color: AppColors.primaryGreen),
               const SizedBox(height: 12),
               Text(
-                'Bottle $position of $total — codes verified ✓',
+                'Bottle ${_results.length + 1} — codes verified ✓',
                 style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 16),
@@ -552,8 +441,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Widget _buildSummaryView() {
-    final results = _results;
-    final validBottles = results.where((b) => b.isValid).toList();
+    final validBottles = _results.where((b) => b.isValid).toList();
     final total = validBottles.length * 10;
 
     return Column(
@@ -575,10 +463,10 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
         Expanded(
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: results.length,
+            itemCount: _results.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final bottle = results[index];
+              final bottle = _results[index];
               return ListTile(
                 leading: Icon(
                   bottle.isValid ? Icons.check_circle : Icons.cancel,
