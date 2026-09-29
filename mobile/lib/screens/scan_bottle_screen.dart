@@ -51,6 +51,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   String? _pendingRefundCode;
   String? _pendingManufacturingCode;
   String? _pendingBarcode;
+  bool _secondIsBarcodeMode = false;
   double? _latitude;
   double? _longitude;
 
@@ -127,20 +128,24 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     }
   }
 
-  // A code starting with our own manufacturing-QR prefix is treated as an
-  // attempted match (and must verify); anything else is assumed to be the
-  // bottle's own pre-existing product barcode, used when it has no
-  // manufacturing QR sticker — recorded, not validated against anything.
+  // The bottle's own product barcode is only accepted after staff explicitly
+  // taps "No manufacturing QR" below — never auto-detected — so a stray code
+  // from a neighbouring bottle still in the camera frame can't silently hijack
+  // this step. Absent that, any code not starting with our manufacturing-QR
+  // prefix is ignored and the camera keeps waiting for the real one.
   Future<void> _handleSecondDetect(String code) async {
-    setState(() => _scanStep = _ScanStep.busy);
-
-    if (!code.startsWith('TSM-M-')) {
+    if (_secondIsBarcodeMode) {
       setState(() {
         _pendingBarcode = code;
+        _secondIsBarcodeMode = false;
         _scanStep = _ScanStep.condition;
       });
       return;
     }
+
+    if (!code.startsWith('TSM-M-')) return;
+
+    setState(() => _scanStep = _ScanStep.busy);
 
     try {
       await _apiService.verifyManufacturingQr(
@@ -210,6 +215,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _pendingRefundCode = null;
       _pendingManufacturingCode = null;
       _pendingBarcode = null;
+      _secondIsBarcodeMode = false;
       _scanStep = _ScanStep.refund;
     });
 
@@ -278,7 +284,9 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     ];
     final String instruction;
     if (_scanStep == _ScanStep.second) {
-      instruction = "Scan the MANUFACTURING QR — or the bottle's own BARCODE if it has none";
+      instruction = _secondIsBarcodeMode
+          ? 'Scan the bottle\'s BARCODE'
+          : 'Scan the MANUFACTURING QR of this same bottle';
     } else {
       instruction = 'Scan the REFUND QR code (top of bottle)';
     }
@@ -334,6 +342,14 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
+                if (_scanStep == _ScanStep.second && !_secondIsBarcodeMode) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
+                    onPressed: () => setState(() => _secondIsBarcodeMode = true),
+                    child: const Text('No Manufacturing QR — Scan Barcode'),
+                  ),
+                ],
                 if (_results.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   OutlinedButton(
