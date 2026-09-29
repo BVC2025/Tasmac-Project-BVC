@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -52,12 +54,19 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   String? _pendingManufacturingCode;
   String? _pendingBarcode;
   bool _secondIsBarcodeMode = false;
+  String? _lastIgnoredCode;
   double? _latitude;
   double? _longitude;
 
   final List<ScannedBottle> _results = [];
 
-  Future<Position> _getCurrentPosition() async {
+  // The whole batch is scanned from one spot at the counter, so the GPS fix
+  // only needs to happen once per session — every bottle after the first
+  // reuses it instead of paying for a fresh (and occasionally slow or
+  // indoors-unreliable) high-accuracy fix each time.
+  Future<void> _ensureLocation() async {
+    if (_latitude != null && _longitude != null) return;
+
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) throw Exception('Location services are disabled');
 
@@ -69,9 +78,15 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       throw Exception('Location permission is required to process a return');
     }
 
-    return Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
+      );
+      _latitude = position.latitude;
+      _longitude = position.longitude;
+    } on TimeoutException {
+      throw Exception('Could not get a GPS fix — move to an open area and try again');
+    }
   }
 
   void _startScanning(int count) {
@@ -99,15 +114,13 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     setState(() => _scanStep = _ScanStep.busy);
 
     try {
-      final position = await _getCurrentPosition();
-      _latitude ??= position.latitude;
-      _longitude ??= position.longitude;
+      await _ensureLocation();
 
       await _apiService.verifyRefundQr(
         widget.token,
         refundQrCode: code,
-        latitude: position.latitude,
-        longitude: position.longitude,
+        latitude: _latitude!,
+        longitude: _longitude!,
       );
 
       setState(() {
@@ -132,7 +145,9 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   // taps "No manufacturing QR" below — never auto-detected — so a stray code
   // from a neighbouring bottle still in the camera frame can't silently hijack
   // this step. Absent that, any code not starting with our manufacturing-QR
-  // prefix is ignored and the camera keeps waiting for the real one.
+  // prefix is flagged (once, not every frame) and the camera keeps waiting
+  // for the real one — never silently ignored, so staff who scan the wrong
+  // bottle or jump ahead see why nothing happened.
   Future<void> _handleSecondDetect(String code) async {
     if (_secondIsBarcodeMode) {
       setState(() {
@@ -143,7 +158,14 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       return;
     }
 
-    if (!code.startsWith('TSM-M-')) return;
+    if (!code.startsWith('TSM-M-')) {
+      if (code != _lastIgnoredCode) {
+        _lastIgnoredCode = code;
+        _showSnack("That's not this bottle's manufacturing QR. Scan the MANUFACTURING QR of the bottle you just verified — or tap \"No Manufacturing QR\" below.");
+      }
+      return;
+    }
+    _lastIgnoredCode = null;
 
     setState(() => _scanStep = _ScanStep.busy);
 
@@ -216,6 +238,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _pendingManufacturingCode = null;
       _pendingBarcode = null;
       _secondIsBarcodeMode = false;
+      _lastIgnoredCode = null;
       _scanStep = _ScanStep.refund;
     });
 
