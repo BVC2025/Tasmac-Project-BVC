@@ -107,6 +107,7 @@ def _to_out(transaction: ReturnTransaction) -> ReturnTransactionOut:
         payment_amount=float(payment.amount) if payment else None,
         payment_reference=payment.reference_id if payment else None,
         payment_status=payment.status.value if payment else None,
+        payment_customer_identifier=payment.customer_identifier if payment else None,
     )
 
 

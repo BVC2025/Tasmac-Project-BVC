@@ -69,6 +69,10 @@ class ReturnDetailScreen extends StatelessWidget {
           else
             _section('Payment', [
               _row('Method', (item['payment_method'] ?? '—').toString().toUpperCase()),
+              _row(
+                item['payment_method'] == 'upi' ? 'Customer UPI ID' : 'Customer Phone',
+                item['payment_customer_identifier'] ?? '—',
+              ),
               _row('Amount', item['payment_amount'] != null ? '₹${item['payment_amount']}' : '—'),
               _row('Reference', item['payment_reference'] ?? '—'),
               _row('Payment Status', (item['payment_status'] ?? '—').toString().toUpperCase()),

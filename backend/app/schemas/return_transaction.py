@@ -75,3 +75,4 @@ class ReturnTransactionOut(BaseModel):
     payment_amount: float | None = None
     payment_reference: str | None = None
     payment_status: str | None = None
+    payment_customer_identifier: str | None = None
