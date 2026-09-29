@@ -53,6 +53,33 @@ class CompleteReturnResponse(BaseModel):
     created_at: datetime
 
 
+class BatchBottleItem(BaseModel):
+    refund_qr_code: str
+    # Exactly one of these two should be set: manufacturing_qr_code when the
+    # scanned second code matched this bottle's own manufacturing QR, or
+    # product_barcode when the bottle had none and staff scanned its real
+    # manufacturer barcode instead (recorded, not validated against anything).
+    manufacturing_qr_code: str | None = None
+    product_barcode: str | None = None
+
+
+class CompleteReturnBatchRequest(BaseModel):
+    latitude: float
+    longitude: float
+    payment_method: PaymentMethod
+    customer_identifier: str
+    bottles: list[BatchBottleItem]
+
+
+class CompleteReturnBatchResponse(BaseModel):
+    payment_reference: str | None
+    payment_status: str
+    amount: float
+    count: int
+    distance_meters: float
+    created_at: datetime
+
+
 class RejectReturnResponse(BaseModel):
     id: int
     status: ReturnStatus

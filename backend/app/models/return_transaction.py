@@ -44,8 +44,9 @@ class ReturnTransaction(TimestampMixin, Base):
     evidence_image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), nullable=True)
 
     bottle: Mapped["Bottle"] = relationship(back_populates="return_transactions")
     shop: Mapped["Shop"] = relationship(back_populates="return_transactions")
     staff_user: Mapped["User"] = relationship()
-    payment: Mapped["Payment"] = relationship(back_populates="return_transaction", uselist=False)
+    payment: Mapped["Payment"] = relationship(back_populates="return_transactions")

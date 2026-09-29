@@ -320,6 +320,39 @@ class ApiService {
     throw ApiException(_extractError(response.body) ?? 'Payment failed. Please retry.');
   }
 
+  /// Each item is {'refund_qr_code': ..., 'manufacturing_qr_code': ...} or
+  /// {'refund_qr_code': ..., 'product_barcode': ...} (see [BatchBottleItem]
+  /// on the backend — exactly one of the latter two per bottle).
+  Future<Map<String, dynamic>> completeReturnBatch(
+    String token, {
+    required List<Map<String, String?>> bottles,
+    required double latitude,
+    required double longitude,
+    required String paymentMethod,
+    required String customerIdentifier,
+  }) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/returns/complete-batch'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({
+          'bottles': bottles,
+          'latitude': latitude,
+          'longitude': longitude,
+          'payment_method': paymentMethod,
+          'customer_identifier': customerIdentifier,
+        }),
+      ),
+      timeout: _paymentTimeout,
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_extractError(response.body) ?? 'Payment failed. Please retry.');
+  }
+
   Future<Map<String, dynamic>> rejectReturn(
     String token, {
     required String reason,

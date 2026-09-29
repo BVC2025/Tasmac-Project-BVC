@@ -308,3 +308,99 @@ def test_service_time_window_blocks_outside_current_hour():
             json={"service_start_time": None, "service_end_time": None},
             headers=admin_headers,
         )
+
+
+def test_complete_batch_pays_once_for_all_bottles():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    headers = {"Authorization": f"Bearer {staff_token}"}
+    refund_1, mfg_1 = _generate_bottle()
+    refund_2, mfg_2 = _generate_bottle()
+
+    response = client.post(
+        "/returns/complete-batch",
+        json={
+            "latitude": SHOP_LAT,
+            "longitude": SHOP_LNG,
+            "payment_method": "upi",
+            "customer_identifier": "customer@upi",
+            "bottles": [
+                {"refund_qr_code": refund_1, "manufacturing_qr_code": mfg_1},
+                {"refund_qr_code": refund_2, "manufacturing_qr_code": mfg_2},
+            ],
+        },
+        headers=headers,
+    )
+    if response.status_code == 402:
+        return  # simulated payment gateway rolled a failure; not what this test checks
+    assert response.status_code == 201
+    body = response.json()
+    assert body["count"] == 2
+    assert body["amount"] == 20.0
+
+    mine = client.get("/returns/mine", headers=headers)
+    assert mine.status_code == 200
+    codes = [t["qr_code"] for t in mine.json()]
+    assert refund_1 in codes and refund_2 in codes
+
+
+def test_complete_batch_with_barcode_fallback_records_it():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    headers = {"Authorization": f"Bearer {staff_token}"}
+    refund_qr, _ = _generate_bottle()
+
+    response = client.post(
+        "/returns/complete-batch",
+        json={
+            "latitude": SHOP_LAT,
+            "longitude": SHOP_LNG,
+            "payment_method": "phone",
+            "customer_identifier": "9876543210",
+            "bottles": [{"refund_qr_code": refund_qr, "product_barcode": "8901030826404"}],
+        },
+        headers=headers,
+    )
+    if response.status_code == 402:
+        return
+    assert response.status_code == 201
+
+    mine = client.get("/returns/mine", headers=headers)
+    entry = next(t for t in mine.json() if t["qr_code"] == refund_qr)
+    assert entry["product_barcode"] == "8901030826404"
+
+
+def test_complete_batch_rejects_if_any_bottle_already_returned():
+    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    headers = {"Authorization": f"Bearer {staff_token}"}
+    refund_1, mfg_1 = _generate_bottle()
+    refund_2, mfg_2 = _generate_bottle()
+
+    # Return bottle 2 on its own first, so it's no longer ISSUED.
+    solo = client.post(
+        "/returns/complete-batch",
+        json={
+            "latitude": SHOP_LAT,
+            "longitude": SHOP_LNG,
+            "payment_method": "upi",
+            "customer_identifier": "solo@upi",
+            "bottles": [{"refund_qr_code": refund_2, "manufacturing_qr_code": mfg_2}],
+        },
+        headers=headers,
+    )
+    if solo.status_code == 402:
+        return
+
+    response = client.post(
+        "/returns/complete-batch",
+        json={
+            "latitude": SHOP_LAT,
+            "longitude": SHOP_LNG,
+            "payment_method": "upi",
+            "customer_identifier": "customer@upi",
+            "bottles": [
+                {"refund_qr_code": refund_1, "manufacturing_qr_code": mfg_1},
+                {"refund_qr_code": refund_2, "manufacturing_qr_code": mfg_2},
+            ],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 409

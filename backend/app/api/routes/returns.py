@@ -16,6 +16,8 @@ from app.models.return_transaction import RejectionReason, ReturnStatus, ReturnT
 from app.models.shop import Shop
 from app.models.user import User, UserRole
 from app.schemas.return_transaction import (
+    CompleteReturnBatchRequest,
+    CompleteReturnBatchResponse,
     CompleteReturnRequest,
     CompleteReturnResponse,
     RejectReturnResponse,
@@ -198,6 +200,16 @@ def complete_return(
 
     payment_success, reference_id = _simulate_payment()
 
+    payment = Payment(
+        amount=10.00,
+        method=payload.payment_method,
+        status=PaymentStatus.SUCCESS if payment_success else PaymentStatus.FAILED,
+        reference_id=reference_id,
+        customer_identifier=payload.customer_identifier,
+    )
+    db.add(payment)
+    db.flush()
+
     transaction = ReturnTransaction(
         bottle_id=bottle.id,
         shop_id=shop.id,
@@ -206,19 +218,9 @@ def complete_return(
         latitude=payload.latitude,
         longitude=payload.longitude,
         product_barcode=payload.product_barcode,
+        payment_id=payment.id,
     )
     db.add(transaction)
-    db.flush()
-
-    payment = Payment(
-        return_transaction_id=transaction.id,
-        amount=10.00,
-        method=payload.payment_method,
-        status=PaymentStatus.SUCCESS if payment_success else PaymentStatus.FAILED,
-        reference_id=reference_id,
-        customer_identifier=payload.customer_identifier,
-    )
-    db.add(payment)
 
     if payment_success:
         bottle.status = BottleStatus.RETURNED
@@ -247,6 +249,88 @@ def complete_return(
         amount=float(payment.amount),
         distance_meters=round(distance, 1),
         created_at=transaction.created_at,
+    )
+
+
+@router.post("/complete-batch", response_model=CompleteReturnBatchResponse, status_code=status.HTTP_201_CREATED)
+def complete_return_batch(
+    payload: CompleteReturnBatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shop, distance = _check_access(current_user, payload.latitude, payload.longitude)
+
+    if not payload.bottles:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No bottles to process")
+
+    # Re-validate every bottle server-side rather than trusting the client's
+    # scan-time results — statuses could have changed since scanning.
+    validated: list[Bottle] = []
+    for item in payload.bottles:
+        bottle = db.query(Bottle).filter(Bottle.refund_qr_code == item.refund_qr_code).first()
+        if bottle is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Refund QR {item.refund_qr_code} not recognized"
+            )
+        if item.manufacturing_qr_code is not None and bottle.manufacturing_qr_code != item.manufacturing_qr_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Manufacturing QR does not match bottle {item.refund_qr_code}",
+            )
+        if bottle.status != BottleStatus.ISSUED:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Bottle {item.refund_qr_code} has already been {bottle.status.value}",
+            )
+        validated.append(bottle)
+
+    amount = 10.00 * len(validated)
+    payment_success, reference_id = _simulate_payment()
+
+    payment = Payment(
+        amount=amount,
+        method=payload.payment_method,
+        status=PaymentStatus.SUCCESS if payment_success else PaymentStatus.FAILED,
+        reference_id=reference_id,
+        customer_identifier=payload.customer_identifier,
+    )
+    db.add(payment)
+    db.flush()
+
+    for bottle, item in zip(validated, payload.bottles):
+        transaction = ReturnTransaction(
+            bottle_id=bottle.id,
+            shop_id=shop.id,
+            staff_user_id=current_user.id,
+            status=ReturnStatus.VERIFIED if payment_success else ReturnStatus.PENDING,
+            latitude=payload.latitude,
+            longitude=payload.longitude,
+            product_barcode=item.product_barcode,
+            payment_id=payment.id,
+        )
+        db.add(transaction)
+        if payment_success:
+            bottle.status = BottleStatus.RETURNED
+
+    log_action(
+        db=db, user_id=current_user.id, action="complete_return_batch", entity_type="payment",
+        entity_id=payment.id,
+        extra_data={"bottle_count": len(validated), "payment_success": payment_success, "reference_id": reference_id},
+    )
+
+    db.commit()
+    db.refresh(payment)
+
+    if not payment_success:
+        raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Payment failed or timed out. Please retry.")
+
+    return CompleteReturnBatchResponse(
+        payment_reference=payment.reference_id,
+        payment_status=payment.status.value,
+        amount=float(payment.amount),
+        count=len(validated),
+        distance_meters=round(distance, 1),
+        created_at=payment.created_at,
     )
 
 

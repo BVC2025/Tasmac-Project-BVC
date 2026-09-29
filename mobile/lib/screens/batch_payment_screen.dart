@@ -7,35 +7,33 @@ import '../services/api_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
-import 'reject_bottle_screen.dart';
+import 'scan_bottle_screen.dart';
 
 enum _PaymentStep { chooseMethod, scanUpi, enterPhone, processing, success, failed, serverUnavailable }
 
-class PaymentScreen extends StatefulWidget {
+/// One combined payment for every valid bottle from a scan batch (a batch of
+/// one is just the ordinary single-bottle case).
+class BatchPaymentScreen extends StatefulWidget {
   final String token;
-  final String refundQrCode;
-  final String manufacturingQrCode;
+  final List<ScannedBottle> bottles;
   final double latitude;
   final double longitude;
-  final String? productBarcode;
   final Map<String, dynamic> user;
 
-  const PaymentScreen({
+  const BatchPaymentScreen({
     super.key,
     required this.token,
-    required this.refundQrCode,
-    required this.manufacturingQrCode,
+    required this.bottles,
     required this.latitude,
     required this.longitude,
-    this.productBarcode,
     required this.user,
   });
 
   @override
-  State<PaymentScreen> createState() => _PaymentScreenState();
+  State<BatchPaymentScreen> createState() => _BatchPaymentScreenState();
 }
 
-class _PaymentScreenState extends State<PaymentScreen> {
+class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
   final _apiService = ApiService();
   final _phoneController = TextEditingController();
 
@@ -44,6 +42,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
   Timer? _countdownTimer;
   String? _errorMessage;
   Map<String, dynamic>? _result;
+
+  int get _amount => widget.bottles.length * 10;
 
   void _startCountdown() {
     _secondsLeft = 30;
@@ -64,15 +64,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
     _startCountdown();
 
     try {
-      final result = await _apiService.completeReturn(
+      final result = await _apiService.completeReturnBatch(
         widget.token,
-        refundQrCode: widget.refundQrCode,
-        manufacturingQrCode: widget.manufacturingQrCode,
+        bottles: [
+          for (final bottle in widget.bottles)
+            {
+              'refund_qr_code': bottle.refundQrCode,
+              'manufacturing_qr_code': bottle.manufacturingQrCode,
+              'product_barcode': bottle.productBarcode,
+            },
+        ],
         latitude: widget.latitude,
         longitude: widget.longitude,
         paymentMethod: method,
         customerIdentifier: customerIdentifier,
-        productBarcode: widget.productBarcode,
       );
       _countdownTimer?.cancel();
       if (!mounted) return;
@@ -158,9 +163,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
             children: [
               const Icon(Icons.currency_rupee, size: 56, color: AppColors.primaryGreen),
               const SizedBox(height: 12),
-              const Text(
-                '₹10 Refund',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              Text(
+                '₹$_amount Refund',
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${widget.bottles.length} bottle${widget.bottles.length == 1 ? '' : 's'} × ₹10',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 8),
               const Text(
@@ -251,7 +261,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Text('Processing ₹10 refund…', style: TextStyle(fontSize: 16)),
+          Text('Processing ₹$_amount refund…', style: const TextStyle(fontSize: 16)),
           const SizedBox(height: 4),
           const Text('Please do not close the app', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
         ],
@@ -272,8 +282,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(height: 16),
               const Text('Refund Successful!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Text('Bottle: ${_result?['qr_code'] ?? ''}'),
-              Text('Amount: ₹${_result?['amount'] ?? '10'}'),
+              Text('Bottles: ${_result?['count'] ?? widget.bottles.length}'),
+              Text('Amount: ₹${_result?['amount'] ?? _amount}'),
               Text('Reference: ${_result?['payment_reference'] ?? ''}'),
               const SizedBox(height: 24),
               FilledButton(
@@ -312,7 +322,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'The bottle has not been marked as returned.',
+                'No bottle has been marked as returned.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
               ),
@@ -361,25 +371,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
               OutlinedButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => RejectBottleScreen(
-                        token: widget.token,
-                        refundQrCode: widget.refundQrCode,
-                        latitude: widget.latitude,
-                        longitude: widget.longitude,
-                        productBarcode: widget.productBarcode,
-                        initialReason: 'other',
-                      ),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.flag_outlined),
-                label: const Text('Log as rejected instead'),
               ),
             ],
           ),
