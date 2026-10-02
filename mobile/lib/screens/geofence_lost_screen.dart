@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
 import 'login_screen.dart';
@@ -28,8 +29,10 @@ class _GeofenceLostScreenState extends State<GeofenceLostScreen> {
     if (mounted) setState(() => _checking = false);
   }
 
-  void _logout() {
+  Future<void> _logout() async {
     GeofenceMonitor.instance.stop();
+    await AuthStorage.clear();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,

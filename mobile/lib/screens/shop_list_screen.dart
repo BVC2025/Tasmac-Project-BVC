@@ -28,9 +28,28 @@ class _ShopListScreenState extends State<ShopListScreen> {
     });
   }
 
-  Future<void> _deactivate(int shopId) async {
+  Future<void> _confirmDeactivate(Map<String, dynamic> shop) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Deactivate Shop?'),
+        content: Text(
+          'Staff assigned to "${shop['name']}" will no longer be able to log in or process returns. Continue?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     try {
-      await _apiService.deactivateShop(widget.token, shopId);
+      await _apiService.deactivateShop(widget.token, shop['id'] as int);
       _refresh();
     } catch (e) {
       if (!mounted) return;
@@ -187,10 +206,19 @@ class _ShopListScreenState extends State<ShopListScreen> {
                       onPressed: () => _editHours(shop),
                     ),
                     if (isActive)
-                      IconButton(
-                        icon: const Icon(Icons.block, color: Colors.red),
-                        tooltip: 'Deactivate',
-                        onPressed: () => _deactivate(shop['id'] as int),
+                      // A destructive action sits in its own menu, a tap away
+                      // from the schedule button, instead of a second icon
+                      // right next to it — a finger slipping while reaching
+                      // for "set hours" used to deactivate the shop instead.
+                      PopupMenuButton<void>(
+                        tooltip: 'More options',
+                        onSelected: (_) {},
+                        itemBuilder: (context) => [
+                          PopupMenuItem<void>(
+                            onTap: () => _confirmDeactivate(shop),
+                            child: const Text('Deactivate Shop', style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
                       )
                     else
                       const Padding(

@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../app_navigator.dart';
 import '../services/api_service.dart';
+import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
@@ -89,7 +90,9 @@ class _LocationGateScreenState extends State<LocationGateScreen> {
     }
   }
 
-  void _logout() {
+  Future<void> _logout() async {
+    await AuthStorage.clear();
+    if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (route) => false,

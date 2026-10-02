@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../services/auth_storage.dart';
 import '../theme/app_colors.dart';
 import 'home_screen.dart';
 import 'location_gate_screen.dart';
@@ -38,6 +39,12 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       final token = result['access_token'] as String;
       final user = await _apiService.getCurrentUser(token);
+
+      if (_rememberMe) {
+        await AuthStorage.save(token, user);
+      } else {
+        await AuthStorage.clear();
+      }
 
       if (!mounted) return;
 
