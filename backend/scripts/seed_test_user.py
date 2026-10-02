@@ -46,6 +46,7 @@ def run():
 
             user = User(
                 full_name=data["full_name"],
+                user_id=data["phone_number"],
                 phone_number=data["phone_number"],
                 hashed_password=hash_password(data["password"]),
                 role=data["role"],

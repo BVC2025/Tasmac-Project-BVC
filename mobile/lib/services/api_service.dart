@@ -50,12 +50,12 @@ class ApiService {
     'Authorization': 'Bearer $token',
   };
 
-  Future<Map<String, dynamic>> login(String phoneNumber, String password) async {
+  Future<Map<String, dynamic>> login(String userId, String password) async {
     final response = await _send(
       () => http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone_number': phoneNumber, 'password': password}),
+        body: jsonEncode({'user_id': userId, 'password': password}),
       ),
     );
 
@@ -93,6 +93,7 @@ class ApiService {
   Future<Map<String, dynamic>> createStaff(
     String token, {
     required String fullName,
+    required String userId,
     required String phoneNumber,
     required String password,
     required String role,
@@ -104,6 +105,7 @@ class ApiService {
         headers: _jsonHeaders(token),
         body: jsonEncode({
           'full_name': fullName,
+          'user_id': userId,
           'phone_number': phoneNumber,
           'password': password,
           'role': role,
@@ -117,6 +119,37 @@ class ApiService {
     }
 
     throw ApiException(_extractError(response.body) ?? 'Could not create staff');
+  }
+
+  Future<Map<String, dynamic>> uploadStaffPhoto(String token, int staffId, Uint8List photoBytes) async {
+    final uri = Uri.parse('$baseUrl/staff/$staffId/photo');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..files.add(http.MultipartFile.fromBytes('photo', photoBytes, filename: 'photo.jpg'));
+
+    http.StreamedResponse streamed;
+    try {
+      streamed = await request.send().timeout(_defaultTimeout);
+    } on TimeoutException {
+      throw ServerUnavailableException();
+    } on http.ClientException {
+      throw ServerUnavailableException();
+    }
+
+    final response = await http.Response.fromStream(streamed);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_extractError(response.body) ?? 'Could not upload staff photo');
+  }
+
+  Future<Uint8List> getStaffPhoto(String token, int staffId) async {
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl/staff/$staffId/photo'), headers: _authHeaders(token)),
+    );
+    if (response.statusCode == 200) return response.bodyBytes;
+    throw ApiException(_extractError(response.body) ?? 'Could not load staff photo');
   }
 
   Future<Map<String, dynamic>> resetStaffPassword(String token, int staffId, String newPassword) async {

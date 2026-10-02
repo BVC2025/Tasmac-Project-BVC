@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../services/voice_service.dart';
@@ -137,16 +140,7 @@ class HomeScreen extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        radius: 26,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: Text(
-                          (user['full_name'] as String? ?? '?').trim().isNotEmpty
-                              ? (user['full_name'] as String).trim()[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22),
-                        ),
-                      ),
+                      _StaffAvatar(token: token, user: user),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
@@ -154,25 +148,51 @@ class HomeScreen extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              user['phone_number'] ?? '',
+                              user['user_id'] ?? '',
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
                             ),
-                            const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                (user['role'] as String? ?? '').toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.6,
+                            const SizedBox(height: 6),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    (user['role'] as String? ?? '').toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                if (user['shop_name'] != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.18),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.storefront, color: Colors.white, size: 12),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          user['shop_name'],
+                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
                             if (locationInfo != null) ...[
                               const SizedBox(height: 8),
@@ -282,6 +302,54 @@ class _ActionCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Shows the logged-in staff/admin's uploaded photo (set by an admin when
+/// creating the account) in the header, falling back to their name's first
+/// letter when no photo was uploaded or it fails to load.
+class _StaffAvatar extends StatefulWidget {
+  final String token;
+  final Map<String, dynamic> user;
+
+  const _StaffAvatar({required this.token, required this.user});
+
+  @override
+  State<_StaffAvatar> createState() => _StaffAvatarState();
+}
+
+class _StaffAvatarState extends State<_StaffAvatar> {
+  late final Future<Uint8List?> _photoFuture = _loadPhoto();
+
+  Future<Uint8List?> _loadPhoto() async {
+    if (widget.user['has_photo'] != true) return null;
+    try {
+      return await ApiService().getStaffPhoto(widget.token, widget.user['id'] as int);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = (widget.user['full_name'] as String? ?? '?').trim().isNotEmpty
+        ? (widget.user['full_name'] as String).trim()[0].toUpperCase()
+        : '?';
+
+    return FutureBuilder<Uint8List?>(
+      future: _photoFuture,
+      builder: (context, snapshot) {
+        final bytes = snapshot.data;
+        return CircleAvatar(
+          radius: 26,
+          backgroundColor: Colors.white.withValues(alpha: 0.2),
+          backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+          child: bytes == null
+              ? Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22))
+              : null,
+        );
+      },
     );
   }
 }

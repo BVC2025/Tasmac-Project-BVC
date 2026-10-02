@@ -9,7 +9,7 @@ TEST_PASSWORD = "Staff@123"
 
 
 def test_login_success():
-    response = client.post("/auth/login", json={"phone_number": TEST_PHONE, "password": TEST_PASSWORD})
+    response = client.post("/auth/login", json={"user_id": TEST_PHONE, "password": TEST_PASSWORD})
     assert response.status_code == 200
     body = response.json()
     assert body["token_type"] == "bearer"
@@ -17,12 +17,12 @@ def test_login_success():
 
 
 def test_login_wrong_password():
-    response = client.post("/auth/login", json={"phone_number": TEST_PHONE, "password": "wrong-password"})
+    response = client.post("/auth/login", json={"user_id": TEST_PHONE, "password": "wrong-password"})
     assert response.status_code == 401
 
 
 def test_me_endpoint_with_valid_token():
-    login_response = client.post("/auth/login", json={"phone_number": TEST_PHONE, "password": TEST_PASSWORD})
+    login_response = client.post("/auth/login", json={"user_id": TEST_PHONE, "password": TEST_PASSWORD})
     token = login_response.json()["access_token"]
 
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})

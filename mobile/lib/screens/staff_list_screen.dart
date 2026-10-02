@@ -117,7 +117,7 @@ class _StaffListScreenState extends State<StaffListScreen> {
                   ),
                 ),
                 title: Text(member['full_name'] ?? ''),
-                subtitle: Text('${member['phone_number']} • ${member['role']}'),
+                subtitle: Text('ID: ${member['user_id']} • ${member['phone_number']} • ${member['role']}'),
                 trailing: isActive
                     ? Row(
                         mainAxisSize: MainAxisSize.min,

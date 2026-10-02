@@ -19,7 +19,7 @@ FAR_LNG = 77.0888091515679
 
 
 def _login(phone: str, password: str) -> str:
-    response = client.post("/auth/login", json={"phone_number": phone, "password": password})
+    response = client.post("/auth/login", json={"user_id": phone, "password": password})
     assert response.status_code == 200
     return response.json()["access_token"]
 

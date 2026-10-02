@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 
@@ -14,12 +17,15 @@ class AddStaffScreen extends StatefulWidget {
 class _AddStaffScreenState extends State<AddStaffScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _userIdController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
+  final _picker = ImagePicker();
 
   String _role = 'staff';
   int? _shopId;
+  Uint8List? _photoBytes;
   bool _isSaving = false;
   String? _errorMessage;
   late Future<List<dynamic>> _shopsFuture;
@@ -28,6 +34,18 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   void initState() {
     super.initState();
     _shopsFuture = _apiService.listShops(widget.token);
+  }
+
+  Future<void> _pickPhoto(ImageSource source) async {
+    try {
+      final file = await _picker.pickImage(source: source, imageQuality: 70);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+      setState(() => _photoBytes = bytes);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not capture photo: $e')));
+    }
   }
 
   Future<void> _handleSave() async {
@@ -39,14 +57,21 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     });
 
     try {
-      await _apiService.createStaff(
+      final staff = await _apiService.createStaff(
         widget.token,
         fullName: _nameController.text.trim(),
+        userId: _userIdController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         password: _passwordController.text,
         role: _role,
         shopId: _shopId,
       );
+
+      final photoBytes = _photoBytes;
+      if (photoBytes != null) {
+        await _apiService.uploadStaffPhoto(widget.token, staff['id'] as int, photoBytes);
+      }
+
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -65,6 +90,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _userIdController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -77,7 +103,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Form(
               key: _formKey,
@@ -85,10 +111,46 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Center(
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 44,
+                          backgroundColor: Colors.grey.shade200,
+                          backgroundImage: _photoBytes != null ? MemoryImage(_photoBytes!) : null,
+                          child: _photoBytes == null
+                              ? const Icon(Icons.person_outline, size: 44, color: Colors.grey)
+                              : null,
+                        ),
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: PopupMenuButton<ImageSource>(
+                            icon: const CircleAvatar(
+                              radius: 16,
+                              child: Icon(Icons.camera_alt_outlined, size: 16),
+                            ),
+                            onSelected: _pickPhoto,
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(value: ImageSource.camera, child: Text('Camera')),
+                              PopupMenuItem(value: ImageSource.gallery, child: Text('Gallery')),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   TextFormField(
                     controller: _nameController,
                     decoration: const InputDecoration(labelText: 'Full Name', border: OutlineInputBorder()),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter name' : null,
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _userIdController,
+                    decoration: const InputDecoration(labelText: 'User ID', border: OutlineInputBorder()),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter a User ID' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

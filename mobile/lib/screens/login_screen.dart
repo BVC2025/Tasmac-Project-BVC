@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _userIdController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
 
@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final result = await _apiService.login(
-        _phoneController.text.trim(),
+        _userIdController.text.trim(),
         _passwordController.text,
       );
       final token = result['access_token'] as String;
@@ -79,7 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _userIdController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -140,15 +140,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 28),
               TextFormField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
+                controller: _userIdController,
                 decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  hintText: 'Enter your registered mobile number',
-                  prefixIcon: Icon(Icons.phone_outlined),
+                  labelText: 'User ID',
+                  hintText: 'Enter your staff User ID',
+                  prefixIcon: Icon(Icons.badge_outlined),
                 ),
                 validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? 'Enter phone number' : null,
+                    (value == null || value.trim().isEmpty) ? 'Enter User ID' : null,
               ),
               const SizedBox(height: 16),
               TextFormField(

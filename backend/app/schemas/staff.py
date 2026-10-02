@@ -5,6 +5,7 @@ from app.models.user import UserRole
 
 class StaffCreate(BaseModel):
     full_name: str
+    user_id: str
     phone_number: str
     password: str
     role: UserRole = UserRole.STAFF
@@ -13,6 +14,7 @@ class StaffCreate(BaseModel):
 
 class StaffUpdate(BaseModel):
     full_name: str | None = None
+    user_id: str | None = None
     role: UserRole | None = None
     shop_id: int | None = None
     is_active: bool | None = None
@@ -25,9 +27,12 @@ class ResetPasswordRequest(BaseModel):
 class StaffOut(BaseModel):
     id: int
     full_name: str
+    user_id: str
     phone_number: str
     role: UserRole
     shop_id: int | None
+    shop_name: str | None
+    has_photo: bool
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
