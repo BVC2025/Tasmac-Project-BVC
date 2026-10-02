@@ -27,6 +27,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   int? _shopId;
   Uint8List? _photoBytes;
   bool _isSaving = false;
+  bool _obscurePassword = true;
   String? _errorMessage;
   late Future<List<dynamic>> _shopsFuture;
 
@@ -162,8 +163,15 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
                     validator: (v) => (v == null || v.length < 4) ? 'Min 4 characters' : null,
                   ),
                   const SizedBox(height: 16),

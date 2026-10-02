@@ -6,9 +6,9 @@ from app.services.bottle_provisioning import new_bottle
 
 client = TestClient(app)
 
-STAFF_PHONE = "9999999999"
+STAFF_USER_ID = "Staff001"
 STAFF_PASSWORD = "Staff@123"
-ADMIN_PHONE = "8888888888"
+ADMIN_USER_ID = "Admin"
 ADMIN_PASSWORD = "Admin@123"
 
 
@@ -34,14 +34,14 @@ def _seed_bottles(count: int = 1, brand_name: str | None = None) -> list[int]:
 
 def test_staff_cannot_list_bottles():
     _seed_bottles(1)
-    token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.get("/bottles", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
 
 
 def test_admin_can_list_bottles():
     _seed_bottles(1)
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     response = client.get("/bottles", headers=headers)
@@ -51,7 +51,7 @@ def test_admin_can_list_bottles():
 
 def test_bottle_qr_image_endpoints_return_png():
     bottle_id = _seed_bottles(1)[0]
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     for suffix in ["refund", "manufacturing"]:
@@ -63,7 +63,7 @@ def test_bottle_qr_image_endpoints_return_png():
 
 def test_labels_pdf_for_specific_ids():
     ids = _seed_bottles(3)
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     pdf_response = client.get(
@@ -75,7 +75,7 @@ def test_labels_pdf_for_specific_ids():
 
 
 def test_labels_pdf_unknown_ids_returns_404():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     response = client.get("/bottles/labels-pdf?ids=99999999", headers=headers)

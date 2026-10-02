@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 import 'add_staff_screen.dart';
@@ -40,22 +43,32 @@ class _StaffListScreenState extends State<StaffListScreen> {
 
   Future<void> _resetPassword(int staffId, String staffName) async {
     final controller = TextEditingController();
+    bool obscure = true;
+
     final newPassword = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Reset password — $staffName'),
-        content: TextField(
-          controller: controller,
-          obscureText: true,
-          decoration: const InputDecoration(labelText: 'New password'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-            child: const Text('Reset'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Reset password — $staffName'),
+          content: TextField(
+            controller: controller,
+            obscureText: obscure,
+            decoration: InputDecoration(
+              labelText: 'New password',
+              suffixIcon: IconButton(
+                icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                onPressed: () => setDialogState(() => obscure = !obscure),
+              ),
+            ),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+              child: const Text('Reset'),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -109,12 +122,13 @@ class _StaffListScreenState extends State<StaffListScreen> {
               final isActive = member['is_active'] == true;
 
               return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isActive ? Colors.green : Colors.grey,
-                  child: Icon(
-                    member['role'] == 'admin' ? Icons.shield : Icons.person,
-                    color: Colors.white,
-                  ),
+                leading: _EditableStaffAvatar(
+                  token: widget.token,
+                  staffId: member['id'] as int,
+                  hasPhoto: member['has_photo'] == true,
+                  isActive: isActive,
+                  isAdmin: member['role'] == 'admin',
+                  onPhotoChanged: _refresh,
                 ),
                 title: Text(member['full_name'] ?? ''),
                 subtitle: Text('ID: ${member['user_id']} • ${member['phone_number']} • ${member['role']}'),
@@ -139,6 +153,131 @@ class _StaffListScreenState extends State<StaffListScreen> {
             },
           );
         },
+      ),
+    );
+  }
+}
+
+/// Shows a staff member's uploaded photo (or a role icon when none is set)
+/// and lets admin tap it to set or replace it — the only place a photo can
+/// be attached to an *existing* account, since Add Staff only covers the
+/// moment of creation.
+class _EditableStaffAvatar extends StatefulWidget {
+  final String token;
+  final int staffId;
+  final bool hasPhoto;
+  final bool isActive;
+  final bool isAdmin;
+  final VoidCallback onPhotoChanged;
+
+  const _EditableStaffAvatar({
+    required this.token,
+    required this.staffId,
+    required this.hasPhoto,
+    required this.isActive,
+    required this.isAdmin,
+    required this.onPhotoChanged,
+  });
+
+  @override
+  State<_EditableStaffAvatar> createState() => _EditableStaffAvatarState();
+}
+
+class _EditableStaffAvatarState extends State<_EditableStaffAvatar> {
+  final _apiService = ApiService();
+  final _picker = ImagePicker();
+  late Future<Uint8List?> _photoFuture = _loadPhoto();
+  bool _uploading = false;
+
+  Future<Uint8List?> _loadPhoto() async {
+    if (!widget.hasPhoto) return null;
+    try {
+      return await _apiService.getStaffPhoto(widget.token, widget.staffId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _pickAndUpload(ImageSource source) async {
+    try {
+      final file = await _picker.pickImage(source: source, imageQuality: 70);
+      if (file == null) return;
+      final bytes = await file.readAsBytes();
+
+      setState(() => _uploading = true);
+      await _apiService.uploadStaffPhoto(widget.token, widget.staffId, bytes);
+      if (!mounted) return;
+      setState(() {
+        _photoFuture = Future.value(bytes);
+        _uploading = false;
+      });
+      widget.onPhotoChanged();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not set photo: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUpload(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAndUpload(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      child: Stack(
+        children: [
+          FutureBuilder<Uint8List?>(
+            future: _photoFuture,
+            builder: (context, snapshot) {
+              final bytes = snapshot.data;
+              return CircleAvatar(
+                backgroundColor: widget.isActive ? Colors.green : Colors.grey,
+                backgroundImage: bytes != null ? MemoryImage(bytes) : null,
+                child: (bytes == null && !_uploading)
+                    ? Icon(widget.isAdmin ? Icons.shield : Icons.person, color: Colors.white)
+                    : (_uploading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : null),
+              );
+            },
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: const Icon(Icons.camera_alt, size: 12, color: Colors.blueGrey),
+            ),
+          ),
+        ],
       ),
     );
   }

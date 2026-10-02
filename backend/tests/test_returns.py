@@ -9,9 +9,9 @@ from app.services.bottle_provisioning import new_bottle
 
 client = TestClient(app)
 
-STAFF_PHONE = "9999999999"
+STAFF_USER_ID = "Staff001"
 STAFF_PASSWORD = "Staff@123"
-ADMIN_PHONE = "8888888888"
+ADMIN_USER_ID = "Admin"
 ADMIN_PASSWORD = "Admin@123"
 
 # Matches the seeded "TASMAC Outlet - Test" shop location
@@ -54,8 +54,8 @@ def _force_payment_result(monkeypatch, success: bool):
 
 
 def test_verify_refund_qr_success():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, _ = _generate_bottle()
 
     response = client.post(
@@ -68,7 +68,7 @@ def test_verify_refund_qr_success():
 
 
 def test_verify_refund_qr_unknown_code_404():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.post(
         "/returns/verify-refund-qr",
         json={"refund_qr_code": "TSM-R-doesnotexist", "latitude": SHOP_LAT, "longitude": SHOP_LNG},
@@ -78,8 +78,8 @@ def test_verify_refund_qr_unknown_code_404():
 
 
 def test_verify_refund_qr_outside_geofence_403():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, _ = _generate_bottle()
 
     response = client.post(
@@ -91,8 +91,8 @@ def test_verify_refund_qr_outside_geofence_403():
 
 
 def test_verify_manufacturing_qr_success():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
@@ -105,8 +105,8 @@ def test_verify_manufacturing_qr_success():
 
 
 def test_verify_manufacturing_qr_mismatch():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, _ = _generate_bottle()
     _, other_mfg_qr = _generate_bottle()
 
@@ -119,7 +119,7 @@ def test_verify_manufacturing_qr_mismatch():
 
 
 def test_lookup_manufacturing_qr_success():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
@@ -132,7 +132,7 @@ def test_lookup_manufacturing_qr_success():
 
 
 def test_lookup_manufacturing_qr_unknown_code_404():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
 
     response = client.post(
         "/returns/lookup-manufacturing-qr",
@@ -144,8 +144,8 @@ def test_lookup_manufacturing_qr_unknown_code_404():
 
 def test_complete_return_success(monkeypatch):
     _force_payment_result(monkeypatch, True)
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
@@ -174,8 +174,8 @@ def test_complete_return_success(monkeypatch):
 
 def test_complete_return_payment_failure_does_not_mark_bottle_returned(monkeypatch):
     _force_payment_result(monkeypatch, False)
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
 
     response = client.post(
@@ -199,8 +199,8 @@ def test_complete_return_payment_failure_does_not_mark_bottle_returned(monkeypat
 
 def test_complete_return_twice_fails_with_conflict(monkeypatch):
     _force_payment_result(monkeypatch, True)
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
     headers = {"Authorization": f"Bearer {staff_token}"}
     payload = {
@@ -220,8 +220,8 @@ def test_complete_return_twice_fails_with_conflict(monkeypatch):
 
 
 def test_reject_return_with_reason_and_remarks():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, _ = _generate_bottle()
 
     response = client.post(
@@ -242,7 +242,7 @@ def test_reject_return_with_reason_and_remarks():
 
 
 def test_reject_return_without_known_bottle():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.post(
         "/returns/reject",
         data={"reason": "refund_qr_invalid"},
@@ -253,7 +253,7 @@ def test_reject_return_without_known_bottle():
 
 
 def test_reject_return_with_evidence_image():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     fake_image = (b"\x89PNG\r\n\x1a\n" + b"0" * 100)
 
     response = client.post(
@@ -267,8 +267,8 @@ def test_reject_return_with_evidence_image():
 
 def test_staff_can_list_own_returns(monkeypatch):
     _force_payment_result(monkeypatch, True)
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     refund_qr, mfg_qr = _generate_bottle()
 
     client.post(
@@ -290,21 +290,21 @@ def test_staff_can_list_own_returns(monkeypatch):
 
 
 def test_staff_cannot_list_all_returns():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.get("/returns", headers={"Authorization": f"Bearer {staff_token}"})
     assert response.status_code == 403
 
 
 def test_admin_can_list_all_returns():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     response = client.get("/returns", headers={"Authorization": f"Bearer {admin_token}"})
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
 
 def test_service_time_window_blocks_outside_current_hour():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
     shop_id = _seeded_shop_id(admin_token)
 
@@ -335,7 +335,7 @@ def test_service_time_window_blocks_outside_current_hour():
 
 
 def test_complete_batch_pays_once_for_all_bottles():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     headers = {"Authorization": f"Bearer {staff_token}"}
     refund_1, mfg_1 = _generate_bottle()
     refund_2, mfg_2 = _generate_bottle()
@@ -368,7 +368,7 @@ def test_complete_batch_pays_once_for_all_bottles():
 
 
 def test_complete_batch_with_barcode_fallback_records_it():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     headers = {"Authorization": f"Bearer {staff_token}"}
     refund_qr, _ = _generate_bottle()
 
@@ -393,7 +393,7 @@ def test_complete_batch_with_barcode_fallback_records_it():
 
 
 def test_complete_batch_rejects_if_any_bottle_already_returned():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     headers = {"Authorization": f"Bearer {staff_token}"}
     refund_1, mfg_1 = _generate_bottle()
     refund_2, mfg_2 = _generate_bottle()

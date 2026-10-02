@@ -20,8 +20,8 @@ TEST_SHOP = {
 }
 
 TEST_USERS = [
-    {"full_name": "Test Staff", "phone_number": "9999999999", "password": "Staff@123", "role": UserRole.STAFF},
-    {"full_name": "Test Admin", "phone_number": "8888888888", "password": "Admin@123", "role": UserRole.ADMIN},
+    {"full_name": "Test Staff", "user_id": "Staff001", "phone_number": "9999999999", "password": "Staff@123", "role": UserRole.STAFF},
+    {"full_name": "Test Admin", "user_id": "Admin", "phone_number": "8888888888", "password": "Admin@123", "role": UserRole.ADMIN},
 ]
 
 
@@ -46,7 +46,7 @@ def run():
 
             user = User(
                 full_name=data["full_name"],
-                user_id=data["phone_number"],
+                user_id=data["user_id"],
                 phone_number=data["phone_number"],
                 hashed_password=hash_password(data["password"]),
                 role=data["role"],

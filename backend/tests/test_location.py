@@ -4,9 +4,9 @@ from app.main import app
 
 client = TestClient(app)
 
-STAFF_PHONE = "9999999999"
+STAFF_USER_ID = "Staff001"
 STAFF_PASSWORD = "Staff@123"
-ADMIN_PHONE = "8888888888"
+ADMIN_USER_ID = "Admin"
 ADMIN_PASSWORD = "Admin@123"
 
 # Matches the seeded "TASMAC Outlet - Test" shop location
@@ -25,7 +25,7 @@ def _login(phone: str, password: str) -> str:
 
 
 def test_staff_within_geofence():
-    token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.post(
         "/location/verify",
         json={"latitude": SHOP_LAT, "longitude": SHOP_LNG},
@@ -38,7 +38,7 @@ def test_staff_within_geofence():
 
 
 def test_staff_outside_geofence():
-    token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.post(
         "/location/verify",
         json={"latitude": FAR_LAT, "longitude": FAR_LNG},
@@ -51,7 +51,7 @@ def test_staff_outside_geofence():
 
 
 def test_admin_without_shop_gets_400():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     response = client.post(
         "/location/verify",
         json={"latitude": SHOP_LAT, "longitude": SHOP_LNG},

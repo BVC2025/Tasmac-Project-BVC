@@ -4,9 +4,9 @@ from app.main import app
 
 client = TestClient(app)
 
-STAFF_PHONE = "9999999999"
+STAFF_USER_ID = "Staff001"
 STAFF_PASSWORD = "Staff@123"
-ADMIN_PHONE = "8888888888"
+ADMIN_USER_ID = "Admin"
 ADMIN_PASSWORD = "Admin@123"
 
 
@@ -17,13 +17,13 @@ def _login(phone: str, password: str) -> str:
 
 
 def test_staff_user_cannot_list_shops():
-    token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.get("/shops", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
 
 
 def test_admin_can_create_list_and_deactivate_shop():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     create_response = client.post(
@@ -51,7 +51,7 @@ def test_admin_can_create_list_and_deactivate_shop():
 
 
 def test_create_shop_with_duplicate_code_fails():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     client.post(

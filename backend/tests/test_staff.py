@@ -5,8 +5,10 @@ from app.main import app
 client = TestClient(app)
 
 STAFF_PHONE = "9999999999"
+STAFF_USER_ID = "Staff001"
 STAFF_PASSWORD = "Staff@123"
 ADMIN_PHONE = "8888888888"
+ADMIN_USER_ID = "Admin"
 ADMIN_PASSWORD = "Admin@123"
 
 
@@ -17,13 +19,13 @@ def _login(phone: str, password: str) -> str:
 
 
 def test_staff_user_cannot_list_staff():
-    token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.get("/staff", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
 
 
 def test_admin_can_list_staff():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     response = client.get("/staff", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
     assert isinstance(response.json(), list)
@@ -31,7 +33,7 @@ def test_admin_can_list_staff():
 
 
 def test_admin_can_create_and_deactivate_staff():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {token}"}
 
     create_response = client.post(
@@ -55,7 +57,7 @@ def test_admin_can_create_and_deactivate_staff():
 
 
 def test_admin_can_reset_staff_password():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     headers = {"Authorization": f"Bearer {admin_token}"}
 
     create_response = client.post(
@@ -88,7 +90,7 @@ def test_admin_can_reset_staff_password():
 
 
 def test_staff_user_cannot_reset_password():
-    staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     response = client.post(
         "/staff/1/reset-password",
         json={"new_password": "Whatever@123"},
@@ -98,7 +100,7 @@ def test_staff_user_cannot_reset_password():
 
 
 def test_create_staff_with_duplicate_phone_fails():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     response = client.post(
         "/staff",
         json={
@@ -114,12 +116,12 @@ def test_create_staff_with_duplicate_phone_fails():
 
 
 def test_create_staff_with_duplicate_user_id_fails():
-    token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     response = client.post(
         "/staff",
         json={
             "full_name": "Duplicate User ID",
-            "user_id": STAFF_PHONE,
+            "user_id": STAFF_USER_ID,
             "phone_number": "7222222222",
             "password": "Whatever@123",
             "role": "staff",
@@ -130,7 +132,7 @@ def test_create_staff_with_duplicate_user_id_fails():
 
 
 def test_staff_photo_upload_and_fetch():
-    admin_token = _login(ADMIN_PHONE, ADMIN_PASSWORD)
+    admin_token = _login(ADMIN_USER_ID, ADMIN_PASSWORD)
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
 
     create_response = client.post(
@@ -164,6 +166,6 @@ def test_staff_photo_upload_and_fetch():
     admin_fetch = client.get(f"/staff/{staff_id}/photo", headers=admin_headers)
     assert admin_fetch.status_code == 200
 
-    other_staff_token = _login(STAFF_PHONE, STAFF_PASSWORD)
+    other_staff_token = _login(STAFF_USER_ID, STAFF_PASSWORD)
     other_fetch = client.get(f"/staff/{staff_id}/photo", headers={"Authorization": f"Bearer {other_staff_token}"})
     assert other_fetch.status_code == 403
