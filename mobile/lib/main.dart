@@ -7,6 +7,7 @@ import 'screens/login_screen.dart';
 import 'services/api_service.dart';
 import 'services/auth_storage.dart';
 import 'services/voice_service.dart';
+import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -24,6 +25,13 @@ class MyApp extends StatelessWidget {
       navigatorKey: appNavigatorKey,
       title: 'TASMAC Bottle Return',
       theme: buildAppTheme(),
+      // Android 15+ draws apps edge-to-edge, so without this the system
+      // navigation bar covers every screen's bottom button (e.g. the scan
+      // summary's payment button).
+      builder: (context, child) => ColoredBox(
+        color: AppColors.background,
+        child: SafeArea(top: false, child: child!),
+      ),
       home: const _SessionGate(),
     );
   }
