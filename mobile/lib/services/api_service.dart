@@ -6,7 +6,12 @@ import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
   final String message;
-  ApiException(this.message);
+
+  /// HTTP status from the backend, when the caller needs to tell apart e.g.
+  /// "code not found" (404) from "outside service hours/geofence" (403).
+  final int? statusCode;
+
+  ApiException(this.message, {this.statusCode});
 
   @override
   String toString() => message;
@@ -296,7 +301,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not verify refund QR');
+    throw ApiException(_extractError(response.body) ?? 'Could not verify refund QR', statusCode: response.statusCode);
   }
 
   Future<Map<String, dynamic>> verifyManufacturingQr(
@@ -316,7 +321,10 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not verify manufacturing QR');
+    throw ApiException(
+      _extractError(response.body) ?? 'Could not verify manufacturing QR',
+      statusCode: response.statusCode,
+    );
   }
 
   /// Identifies which bottle a manufacturing QR belongs to (by its refund QR

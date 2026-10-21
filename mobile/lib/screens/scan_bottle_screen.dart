@@ -134,11 +134,20 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _showSnack('Server unavailable — try scanning this bottle again.');
       setState(() => _scanStep = _ScanStep.refund);
     } on ApiException catch (e) {
+      // Only an unknown (404) or already-used (409) code says anything about
+      // the bottle. Anything else — outside service hours, outside the
+      // geofence, no shop assigned — is about the staff/shop, so show the
+      // real reason and let them scan this same bottle again instead of
+      // wrongly marking a genuine QR as invalid.
+      if (e.statusCode != 404 && e.statusCode != 409) {
+        _showSnack(e.message);
+        setState(() => _scanStep = _ScanStep.refund);
+        return;
+      }
       // Scanning the wrong or an already-used QR is a scan mistake, not a
       // customer decision — it's recorded in this session's summary only,
       // never sent to the backend as a real rejection.
-      final message = e.toString();
-      final reason = message.toLowerCase().contains('already been') ? 'qr_already_used' : 'refund_qr_invalid';
+      final reason = e.statusCode == 409 ? 'qr_already_used' : 'refund_qr_invalid';
       _finishBottle(ScannedBottle(refundQrCode: code, isValid: false, rejectReason: reason));
     } catch (e) {
       _showSnack(e.toString().replaceFirst('Exception: ', ''));
@@ -188,7 +197,12 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     } on ServerUnavailableException {
       _showSnack('Server unavailable — try scanning this bottle again.');
       setState(() => _scanStep = _ScanStep.second);
-    } on ApiException {
+    } on ApiException catch (e) {
+      if (e.statusCode != 400 && e.statusCode != 404) {
+        _showSnack(e.message);
+        setState(() => _scanStep = _ScanStep.second);
+        return;
+      }
       // Same as an invalid refund QR: a mismatched code is a scan mistake,
       // recorded locally only — not sent to the backend as a rejection.
       _finishBottle(ScannedBottle(
