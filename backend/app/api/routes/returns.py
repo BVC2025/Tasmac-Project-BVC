@@ -28,6 +28,7 @@ from app.schemas.return_transaction import (
     VerifyManufacturingQrResponse,
     VerifyRefundQrRequest,
     VerifyRefundQrResponse,
+    validate_product_barcode,
 )
 from app.services.audit import log_action
 from app.services.shop_access import ensure_within_service_window
@@ -368,6 +369,11 @@ async def reject_return(
     shop = current_user.shop
     if shop is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You are not assigned to a shop")
+
+    try:
+        product_barcode = validate_product_barcode(product_barcode)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
 
     bottle = None
     if refund_qr_code:

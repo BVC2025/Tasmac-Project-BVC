@@ -68,7 +68,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Login failed');
+    throw ApiException(_errorMessage(response, 'Login failed'));
   }
 
   Future<Map<String, dynamic>> getCurrentUser(String token) async {
@@ -92,7 +92,7 @@ class ApiService {
       return jsonDecode(response.body) as List<dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not load staff list');
+    throw ApiException(_errorMessage(response, 'Could not load staff list'));
   }
 
   Future<Map<String, dynamic>> createStaff(
@@ -123,7 +123,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not create staff');
+    throw ApiException(_errorMessage(response, 'Could not create staff'));
   }
 
   Future<Map<String, dynamic>> uploadStaffPhoto(String token, int staffId, Uint8List photoBytes) async {
@@ -146,7 +146,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not upload staff photo');
+    throw ApiException(_errorMessage(response, 'Could not upload staff photo'));
   }
 
   Future<Uint8List> getStaffPhoto(String token, int staffId) async {
@@ -154,7 +154,7 @@ class ApiService {
       () => http.get(Uri.parse('$baseUrl/staff/$staffId/photo'), headers: _authHeaders(token)),
     );
     if (response.statusCode == 200) return response.bodyBytes;
-    throw ApiException(_extractError(response.body) ?? 'Could not load staff photo');
+    throw ApiException(_errorMessage(response, 'Could not load staff photo'));
   }
 
   Future<Map<String, dynamic>> resetStaffPassword(String token, int staffId, String newPassword) async {
@@ -170,7 +170,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not reset password');
+    throw ApiException(_errorMessage(response, 'Could not reset password'));
   }
 
   Future<Map<String, dynamic>> deactivateStaff(String token, int staffId) async {
@@ -182,7 +182,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not deactivate staff');
+    throw ApiException(_errorMessage(response, 'Could not deactivate staff'));
   }
 
   Future<List<dynamic>> listShops(String token) async {
@@ -194,7 +194,7 @@ class ApiService {
       return jsonDecode(response.body) as List<dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not load shop list');
+    throw ApiException(_errorMessage(response, 'Could not load shop list'));
   }
 
   Future<Map<String, dynamic>> createShop(
@@ -227,7 +227,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not create shop');
+    throw ApiException(_errorMessage(response, 'Could not create shop'));
   }
 
   /// Pass `HH:mm` strings for the time fields, or null to clear the restriction.
@@ -252,7 +252,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not update shop hours');
+    throw ApiException(_errorMessage(response, 'Could not update shop hours'));
   }
 
   Future<Map<String, dynamic>> deactivateShop(String token, int shopId) async {
@@ -264,7 +264,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not deactivate shop');
+    throw ApiException(_errorMessage(response, 'Could not deactivate shop'));
   }
 
   Future<Map<String, dynamic>> verifyLocation(String token, double latitude, double longitude) async {
@@ -280,7 +280,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not verify location');
+    throw ApiException(_errorMessage(response, 'Could not verify location'));
   }
 
   Future<Map<String, dynamic>> verifyRefundQr(
@@ -301,7 +301,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not verify refund QR', statusCode: response.statusCode);
+    throw ApiException(_errorMessage(response, 'Could not verify refund QR'), statusCode: response.statusCode);
   }
 
   Future<Map<String, dynamic>> verifyManufacturingQr(
@@ -322,7 +322,7 @@ class ApiService {
     }
 
     throw ApiException(
-      _extractError(response.body) ?? 'Could not verify manufacturing QR',
+      _errorMessage(response, 'Could not verify manufacturing QR'),
       statusCode: response.statusCode,
     );
   }
@@ -346,7 +346,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Manufacturing QR code not recognized');
+    throw ApiException(_errorMessage(response, 'Manufacturing QR code not recognized'));
   }
 
   Future<Map<String, dynamic>> completeReturn(
@@ -380,7 +380,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Payment failed. Please retry.');
+    throw ApiException(_errorMessage(response, 'Payment failed. Please retry.'));
   }
 
   /// Each item is {'refund_qr_code': ..., 'manufacturing_qr_code': ...} or
@@ -413,7 +413,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Payment failed. Please retry.');
+    throw ApiException(_errorMessage(response, 'Payment failed. Please retry.'));
   }
 
   Future<Map<String, dynamic>> rejectReturn(
@@ -455,7 +455,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not submit rejection');
+    throw ApiException(_errorMessage(response, 'Could not submit rejection'));
   }
 
   Future<Uint8List> getEvidenceImage(String token, int returnId) async {
@@ -463,7 +463,7 @@ class ApiService {
       () => http.get(Uri.parse('$baseUrl/returns/$returnId/evidence-image'), headers: _authHeaders(token)),
     );
     if (response.statusCode == 200) return response.bodyBytes;
-    throw ApiException(_extractError(response.body) ?? 'Could not load evidence photo');
+    throw ApiException(_errorMessage(response, 'Could not load evidence photo'));
   }
 
   Future<List<dynamic>> listMyReturns(String token) async {
@@ -475,13 +475,25 @@ class ApiService {
       return jsonDecode(response.body) as List<dynamic>;
     }
 
-    throw ApiException(_extractError(response.body) ?? 'Could not load return history');
+    throw ApiException(_errorMessage(response, 'Could not load return history'));
   }
+
+  /// The backend's own error message, or [fallback] tagged with the HTTP
+  /// status so a non-JSON failure (e.g. a proxy/gateway error page) is never
+  /// indistinguishable from any other.
+  String _errorMessage(http.Response response, String fallback) =>
+      _extractError(response.body) ?? '$fallback (server error ${response.statusCode})';
 
   String? _extractError(String body) {
     try {
-      final decoded = jsonDecode(body) as Map<String, dynamic>;
-      return decoded['detail']?.toString();
+      final detail = (jsonDecode(body) as Map<String, dynamic>)['detail'];
+      // Request-validation errors (422) arrive as a list of {msg, ...}.
+      if (detail is List) {
+        return detail
+            .map((e) => e is Map ? (e['msg'] ?? '').toString().replaceFirst('Value error, ', '') : e.toString())
+            .join('\n');
+      }
+      return detail?.toString();
     } catch (_) {
       return null;
     }
