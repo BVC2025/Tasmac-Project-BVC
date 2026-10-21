@@ -165,12 +165,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 validator: (value) => (value == null || value.isEmpty) ? 'Enter password' : null,
               ),
               const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Wraps onto two lines on narrow handhelds / large font sizes
+              // instead of overflowing off the right edge of the card.
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   InkWell(
                     onTap: () => setState(() => _rememberMe = !_rememberMe),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Checkbox(
                           value: _rememberMe,

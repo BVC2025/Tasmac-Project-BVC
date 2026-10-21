@@ -1,3 +1,4 @@
+import '../widgets/centered_scroll_view.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -395,47 +396,41 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Widget _conditionView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.fact_check_outlined, size: 56, color: AppColors.primaryGreen),
-              const SizedBox(height: 12),
-              Text(
-                'Bottle ${_results.length + 1} — codes verified ✓',
-                style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Check the physical bottle condition',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              const Text(
-                'Broken, cracked, tampered, or otherwise unacceptable?',
-                style: TextStyle(color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: () => _condition(true),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Good — Add to Refund'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(foregroundColor: AppColors.brandRed),
-                onPressed: () => _condition(false),
-                icon: const Icon(Icons.report_gmailerrorred_outlined),
-                label: const Text('Damaged — Reject'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.fact_check_outlined, size: 56, color: AppColors.primaryGreen),
+          const SizedBox(height: 12),
+          Text(
+            'Bottle ${_results.length + 1} — codes verified ✓',
+            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
           ),
-        ),
+          const SizedBox(height: 16),
+          const Text(
+            'Check the physical bottle condition',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+          const Text(
+            'Broken, cracked, tampered, or otherwise unacceptable?',
+            style: TextStyle(color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 28),
+          FilledButton.icon(
+            onPressed: () => _condition(true),
+            icon: const Icon(Icons.check_circle_outline),
+            label: const Text('Good — Add to Refund'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.brandRed),
+            onPressed: () => _condition(false),
+            icon: const Icon(Icons.report_gmailerrorred_outlined),
+            label: const Text('Damaged — Reject'),
+          ),
+        ],
       ),
     );
   }
@@ -539,66 +534,60 @@ class _CountSelectViewState extends State<_CountSelectView> {
   Widget build(BuildContext context) {
     const presets = [1, 3, 5, 10];
 
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(color: AppColors.accentGreen.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.liquor_outlined, color: AppColors.primaryGreen, size: 28),
+          ),
+          const SizedBox(height: 18),
+          const Text('How many bottles?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          const Text(
+            "Ask the customer how many empty bottles they're returning today.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            '$_count',
+            style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: AppColors.primaryGreen),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(color: AppColors.accentGreen.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16)),
-                child: const Icon(Icons.liquor_outlined, color: AppColors.primaryGreen, size: 28),
-              ),
-              const SizedBox(height: 18),
-              const Text('How many bottles?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              const Text(
-                "Ask the customer how many empty bottles they're returning today.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                '$_count',
-                style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: AppColors.primaryGreen),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton.filled(onPressed: () => _set(_count - 1), icon: const Icon(Icons.remove)),
-                  const SizedBox(width: 20),
-                  IconButton.filled(onPressed: () => _set(_count + 1), icon: const Icon(Icons.add)),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  for (final preset in presets)
-                    ChoiceChip(
-                      label: Text('$preset'),
-                      selected: _count == preset,
-                      onSelected: (_) => _set(preset),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () => widget.onStart(_count),
-                  child: Text('Start Scanning ($_count)'),
-                ),
-              ),
+              IconButton.filled(onPressed: () => _set(_count - 1), icon: const Icon(Icons.remove)),
+              const SizedBox(width: 20),
+              IconButton.filled(onPressed: () => _set(_count + 1), icon: const Icon(Icons.add)),
             ],
           ),
-        ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final preset in presets)
+                ChoiceChip(
+                  label: Text('$preset'),
+                  selected: _count == preset,
+                  onSelected: (_) => _set(preset),
+                ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => widget.onStart(_count),
+              child: Text('Start Scanning ($_count)'),
+            ),
+          ),
+        ],
       ),
     );
   }

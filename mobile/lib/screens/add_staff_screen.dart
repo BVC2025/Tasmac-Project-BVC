@@ -191,6 +191,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                       final shops = snapshot.data ?? [];
                       return DropdownButtonFormField<int?>(
                         initialValue: _shopId,
+                        isExpanded: true,
                         decoration: const InputDecoration(
                           labelText: 'Assigned Shop (optional)',
                           border: OutlineInputBorder(),
@@ -200,7 +201,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                           ...shops.map(
                             (shop) => DropdownMenuItem<int?>(
                               value: shop['id'] as int,
-                              child: Text(shop['name'] as String),
+                              child: Text(shop['name'] as String, overflow: TextOverflow.ellipsis),
                             ),
                           ),
                         ],

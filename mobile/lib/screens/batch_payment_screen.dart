@@ -1,3 +1,4 @@
+import '../widgets/centered_scroll_view.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -153,95 +154,83 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
   }
 
   Widget _chooseMethodView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.currency_rupee, size: 56, color: AppColors.primaryGreen),
-              const SizedBox(height: 12),
-              Text(
-                '₹$_amount Refund',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '${widget.bottles.length} bottle${widget.bottles.length == 1 ? '' : 's'} × ₹10',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Does the customer have a UPI QR code available?',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 28),
-              FilledButton.icon(
-                onPressed: () {
-                  setState(() => _step = _PaymentStep.scanUpi);
-                  VoiceService.instance.speak(VoiceMessage.showUpi);
-                },
-                icon: const Icon(Icons.qr_code_scanner),
-                label: const Text('Yes — Scan Customer UPI QR'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () => setState(() => _step = _PaymentStep.enterPhone),
-                icon: const Icon(Icons.phone_android),
-                label: const Text('No — Enter Phone Number'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.currency_rupee, size: 56, color: AppColors.primaryGreen),
+          const SizedBox(height: 12),
+          Text(
+            '₹$_amount Refund',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
-        ),
+          const SizedBox(height: 4),
+          Text(
+            '${widget.bottles.length} bottle${widget.bottles.length == 1 ? '' : 's'} × ₹10',
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Does the customer have a UPI QR code available?',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 28),
+          FilledButton.icon(
+            onPressed: () {
+              setState(() => _step = _PaymentStep.scanUpi);
+              VoiceService.instance.speak(VoiceMessage.showUpi);
+            },
+            icon: const Icon(Icons.qr_code_scanner),
+            label: const Text('Yes — Scan Customer UPI QR'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _step = _PaymentStep.enterPhone),
+            icon: const Icon(Icons.phone_android),
+            label: const Text('No — Enter Phone Number'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _enterPhoneView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Customer Mobile Number',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  labelText: 'Phone Number',
-                  prefixIcon: Icon(Icons.phone_outlined),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: () {
-                  final phone = _phoneController.text.trim();
-                  if (phone.isEmpty) return;
-                  _pay('phone', phone);
-                },
-                child: const Text('Proceed with Refund'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'Customer Mobile Number',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-        ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number',
+              prefixIcon: Icon(Icons.phone_outlined),
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () {
+              final phone = _phoneController.text.trim();
+              if (phone.isEmpty) return;
+              _pay('phone', phone);
+            },
+            child: const Text('Proceed with Refund'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _processingView() {
-    return Center(
+    return CenteredScrollView(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -270,111 +259,93 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
   }
 
   Widget _successView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 64),
-              const SizedBox(height: 16),
-              const Text('Refund Successful!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('Bottles: ${_result?['count'] ?? widget.bottles.length}'),
-              Text('Amount: ₹${_result?['amount'] ?? _amount}'),
-              Text('Reference: ${_result?['payment_reference'] ?? ''}'),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => HomeScreen(user: widget.user, token: widget.token)),
-                    (route) => false,
-                  );
-                },
-                child: const Text('Done'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 64),
+          const SizedBox(height: 16),
+          const Text('Refund Successful!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('Bottles: ${_result?['count'] ?? widget.bottles.length}'),
+          Text('Amount: ₹${_result?['amount'] ?? _amount}'),
+          Text('Reference: ${_result?['payment_reference'] ?? ''}'),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => HomeScreen(user: widget.user, token: widget.token)),
+                (route) => false,
+              );
+            },
+            child: const Text('Done'),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _failedView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, color: AppColors.brandRed, size: 64),
-              const SizedBox(height: 16),
-              const Text('Payment Failed', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage ?? 'The payment could not be completed.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'No bottle has been marked as returned.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => setState(() => _step = _PaymentStep.chooseMethod),
-                child: const Text('Retry'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.error_outline, color: AppColors.brandRed, size: 64),
+          const SizedBox(height: 16),
+          const Text('Payment Failed', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(
+            _errorMessage ?? 'The payment could not be completed.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textSecondary),
           ),
-        ),
+          const SizedBox(height: 8),
+          const Text(
+            'No bottle has been marked as returned.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () => setState(() => _step = _PaymentStep.chooseMethod),
+            child: const Text('Retry'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _serverUnavailableView() {
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off, color: Colors.orange, size: 64),
-              const SizedBox(height: 16),
-              const Text('Server Unavailable', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text(
-                'Could not reach the server. The refund has NOT been processed — '
-                'no charge, no bottle status change.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => setState(() => _step = _PaymentStep.chooseMethod),
-                child: const Text('Retry'),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
-              ),
-            ],
+    return CenteredScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off, color: Colors.orange, size: 64),
+          const SizedBox(height: 16),
+          const Text('Server Unavailable', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          const Text(
+            'Could not reach the server. The refund has NOT been processed — '
+            'no charge, no bottle status change.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textSecondary),
           ),
-        ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () => setState(() => _step = _PaymentStep.chooseMethod),
+            child: const Text('Retry'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
       ),
     );
   }

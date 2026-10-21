@@ -6,6 +6,7 @@ import '../services/api_service.dart';
 import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
+import '../widgets/centered_scroll_view.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -109,83 +110,78 @@ class _LocationGateScreenState extends State<LocationGateScreen> {
           IconButton(icon: const Icon(Icons.logout), tooltip: 'Logout', onPressed: _logout),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_state == _GateState.checking) ...[
-                  const CircularProgressIndicator(color: AppColors.primaryGreen),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Checking your location…',
-                    style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+      body: CenteredScrollView(
+        maxWidth: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_state == _GateState.checking) ...[
+              const CircularProgressIndicator(color: AppColors.primaryGreen),
+              const SizedBox(height: 24),
+              const Text(
+                'Checking your location…',
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+              ),
+            ] else ...[
+              Icon(
+                _state == _GateState.error ? Icons.error_outline : Icons.location_off,
+                size: 64,
+                color: AppColors.brandRed,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'You must be within your shop\'s 100m service area to continue.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 20),
+              if (_state == _GateState.error && _errorMessage != null)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.shade100),
                   ),
-                ] else ...[
-                  Icon(
-                    _state == _GateState.error ? Icons.error_outline : Icons.location_off,
-                    size: 64,
-                    color: AppColors.brandRed,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'You must be within your shop\'s 100m service area to continue.',
+                  child: Text(
+                    _errorMessage!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 15, color: AppColors.textSecondary),
+                    style: TextStyle(color: Colors.red.shade700, fontSize: 13),
                   ),
-                  const SizedBox(height: 20),
-                  if (_state == _GateState.error && _errorMessage != null)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.red.shade100),
-                      ),
-                      child: Text(
-                        _errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
-                      ),
-                    ),
-                  if (_state == _GateState.outOfRange && _result != null)
-                    Card(
-                      color: Colors.red.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            Text(
-                              'Out of range',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red.shade800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text('Shop: ${_result!['shop_name']}'),
-                            Text(
-                              'Distance: ${_result!['distance_meters']} m (limit ${_result!['radius_meters']} m)',
-                            ),
-                          ],
+                ),
+              if (_state == _GateState.outOfRange && _result != null)
+                Card(
+                  color: Colors.red.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Out of range',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade800,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Text('Shop: ${_result!['shop_name']}'),
+                        Text(
+                          'Distance: ${_result!['distance_meters']} m (limit ${_result!['radius_meters']} m)',
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 24),
-                  FilledButton.icon(
-                    onPressed: _checkLocation,
-                    icon: const Icon(Icons.my_location),
-                    label: const Text('Retry'),
                   ),
-                ],
-              ],
-            ),
-          ),
+                ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: _checkLocation,
+                icon: const Icon(Icons.my_location),
+                label: const Text('Retry'),
+              ),
+            ],
+          ],
         ),
       ),
     );

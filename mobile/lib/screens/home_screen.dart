@@ -82,6 +82,10 @@ class HomeScreen extends StatelessWidget {
       ],
     ];
 
+    // The header's text grows with the device's font-size setting, so its
+    // height has to grow with it too or the chips run into the name below.
+    final textScaler = MediaQuery.textScalerOf(context);
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -89,7 +93,7 @@ class HomeScreen extends StatelessWidget {
             backgroundColor: AppColors.primaryGreen,
             foregroundColor: Colors.white,
             pinned: true,
-            expandedHeight: locationInfo != null ? 220 : 190,
+            expandedHeight: 106 + textScaler.scale(locationInfo != null ? 114 : 84),
             actions: [
               PopupMenuButton<VoiceLanguage>(
                 icon: const Icon(Icons.record_voice_over_outlined),
@@ -122,9 +126,12 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16, right: 20),
+              // Right padding keeps the collapsed title clear of the two action icons.
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 16, right: 112),
               title: Text(
                 user['full_name'] ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: Colors.white),
               ),
               background: Container(
@@ -185,9 +192,12 @@ class HomeScreen extends StatelessWidget {
                                       children: [
                                         const Icon(Icons.storefront, color: Colors.white, size: 12),
                                         const SizedBox(width: 4),
-                                        Text(
-                                          user['shop_name'],
-                                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                        Flexible(
+                                          child: Text(
+                                            user['shop_name'],
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -232,12 +242,16 @@ class HomeScreen extends StatelessWidget {
             sliver: SliverLayoutBuilder(
               builder: (context, constraints) {
                 final columns = constraints.crossAxisExtent >= 700 ? 3 : 2;
+                final cardWidth = (constraints.crossAxisExtent - 16 * (columns - 1)) / columns;
+                // Never shorter than padding + icon + two label lines + two
+                // subtitle lines at the device's font size, so cards can't overflow.
+                final minCardHeight = 32 + 44 + 12 + textScaler.scale(15) * 1.4 * 2 + 4 + textScaler.scale(12) * 1.4 * 2;
                 return SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: columns,
                     mainAxisSpacing: 16,
                     crossAxisSpacing: 16,
-                    childAspectRatio: 0.95,
+                    mainAxisExtent: (cardWidth / 0.95).clamp(minCardHeight, double.infinity),
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -289,6 +303,8 @@ class _ActionCard extends StatelessWidget {
               const Spacer(),
               Text(
                 action.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
               ),
               const SizedBox(height: 4),

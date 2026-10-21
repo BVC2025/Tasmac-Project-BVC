@@ -120,9 +120,10 @@ class _RejectBottleScreenState extends State<RejectBottleScreen> {
                 const SizedBox(height: 24),
                 DropdownButtonFormField<String>(
                   initialValue: _selectedReason,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Rejection Reason', border: OutlineInputBorder()),
                   items: rejectionReasons
-                      .map((r) => DropdownMenuItem(value: r.value, child: Text(r.label)))
+                      .map((r) => DropdownMenuItem(value: r.value, child: Text(r.label, overflow: TextOverflow.ellipsis)))
                       .toList(),
                   onChanged: (value) => setState(() => _selectedReason = value ?? _selectedReason),
                 ),
