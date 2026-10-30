@@ -1,7 +1,7 @@
 from datetime import datetime
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.payment import PaymentMethod
 from app.models.return_transaction import RejectionReason, ReturnStatus
@@ -10,6 +10,7 @@ from app.models.return_transaction import RejectionReason, ReturnStatus
 # would make Postgres reject the insert and the request fail with a 500.
 CUSTOMER_IDENTIFIER_MAX_LENGTH = 120  # Payment.customer_identifier
 PRODUCT_BARCODE_MAX_LENGTH = 64  # ReturnTransaction.product_barcode
+MAX_BOTTLES_PER_BATCH = 20
 
 
 def normalize_customer_identifier(value: str) -> str:
@@ -93,11 +94,11 @@ class CompleteReturnResponse(BaseModel):
 
 class BatchBottleItem(BaseModel):
     refund_qr_code: str
-    # Exactly one of these two should be set: manufacturing_qr_code when the
-    # scanned second code matched this bottle's own manufacturing QR, or
-    # product_barcode when the bottle had none and staff scanned its real
-    # manufacturer barcode instead (recorded, not validated against anything).
-    manufacturing_qr_code: str | None = None
+    # A bottle is only refundable when BOTH of its QRs are valid, so the
+    # manufacturing QR is mandatory and is checked against the bottle record.
+    manufacturing_qr_code: str
+    # Legacy field from the old "no manufacturing QR, scan barcode" path; still
+    # accepted and recorded so older app builds don't fail validation.
     product_barcode: str | None = None
 
     _validate_product_barcode = field_validator("product_barcode")(validate_product_barcode)
@@ -108,7 +109,7 @@ class CompleteReturnBatchRequest(BaseModel):
     longitude: float
     payment_method: PaymentMethod
     customer_identifier: str
-    bottles: list[BatchBottleItem]
+    bottles: list[BatchBottleItem] = Field(max_length=MAX_BOTTLES_PER_BATCH)
 
     _normalize_customer_identifier = field_validator("customer_identifier")(normalize_customer_identifier)
 

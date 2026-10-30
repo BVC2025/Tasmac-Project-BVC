@@ -1,4 +1,3 @@
-import '../widgets/centered_scroll_view.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -8,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../services/api_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/centered_scroll_view.dart';
 import 'batch_payment_screen.dart';
 import 'reject_bottle_screen.dart';
 
@@ -15,14 +15,12 @@ import 'reject_bottle_screen.dart';
 class ScannedBottle {
   final String refundQrCode;
   final String? manufacturingQrCode;
-  final String? productBarcode;
   final bool isValid;
   final String? rejectReason;
 
   const ScannedBottle({
     required this.refundQrCode,
     this.manufacturingQrCode,
-    this.productBarcode,
     required this.isValid,
     this.rejectReason,
   });
@@ -30,9 +28,12 @@ class ScannedBottle {
 
 enum _Phase { selectCount, scanning, summary }
 
-// Within the scanning phase, each bottle goes refund -> second (manufacturing
-// QR or, if the bottle has none, its plain product barcode) -> condition.
+// Within the scanning phase, each bottle goes refund QR -> manufacturing QR
+// -> condition. A bottle is only valid when BOTH of its QRs verify.
 enum _ScanStep { refund, second, condition, busy }
+
+/// Upper bound for one customer's batch; the backend enforces the same limit.
+const maxBottlesPerBatch = 20;
 
 class ScanBottleScreen extends StatefulWidget {
   final String token;
@@ -54,8 +55,6 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   _ScanStep _scanStep = _ScanStep.refund;
   String? _pendingRefundCode;
   String? _pendingManufacturingCode;
-  String? _pendingBarcode;
-  bool _secondIsBarcodeMode = false;
   String? _lastIgnoredCode;
   double? _latitude;
   double? _longitude;
@@ -113,6 +112,16 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Future<void> _handleRefundDetect(String code) async {
+    // One QR, one refund: the backend still sees this bottle as unused until
+    // the batch is paid, so a repeat scan within the batch must be caught here.
+    if (_results.any((b) => b.refundQrCode == code)) {
+      if (code != _lastIgnoredCode) {
+        _lastIgnoredCode = code;
+        _showSnack('This refund QR was already scanned in this batch — scan the next bottle.');
+      }
+      return;
+    }
+
     setState(() => _scanStep = _ScanStep.busy);
 
     try {
@@ -155,27 +164,17 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     }
   }
 
-  // The bottle's own product barcode is only accepted after staff explicitly
-  // taps "No manufacturing QR" below — never auto-detected — so a stray code
-  // from a neighbouring bottle still in the camera frame can't silently hijack
-  // this step. Absent that, any code not starting with our manufacturing-QR
-  // prefix is flagged (once, not every frame) and the camera keeps waiting
-  // for the real one — never silently ignored, so staff who scan the wrong
-  // bottle or jump ahead see why nothing happened.
+  // Any code not starting with our manufacturing-QR prefix (a stray code
+  // from a neighbouring bottle, or a refund QR) is flagged once, not every
+  // frame, and the camera keeps waiting for the real one — never silently
+  // ignored, so staff who scan the wrong bottle or jump ahead see why nothing
+  // happened. A bottle with no manufacturing QR at all is rejected via the
+  // "No Manufacturing QR" button, since both QRs are required.
   Future<void> _handleSecondDetect(String code) async {
-    if (_secondIsBarcodeMode) {
-      setState(() {
-        _pendingBarcode = code;
-        _secondIsBarcodeMode = false;
-        _scanStep = _ScanStep.condition;
-      });
-      return;
-    }
-
     if (!code.startsWith('TSM-M-')) {
       if (code != _lastIgnoredCode) {
         _lastIgnoredCode = code;
-        _showSnack("That's not this bottle's manufacturing QR. Scan the MANUFACTURING QR of the bottle you just verified — or tap \"No Manufacturing QR\" below.");
+        _showSnack("That's not this bottle's manufacturing QR. Scan the MANUFACTURING QR of the bottle you just verified — or tap \"No Manufacturing QR — Reject\" below.");
       }
       return;
     }
@@ -216,12 +215,19 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     }
   }
 
+  void _rejectMissingManufacturingQr() {
+    _finishBottle(ScannedBottle(
+      refundQrCode: _pendingRefundCode!,
+      isValid: false,
+      rejectReason: 'manufacturing_qr_missing',
+    ));
+  }
+
   Future<void> _condition(bool isGood) async {
     if (isGood) {
       _finishBottle(ScannedBottle(
         refundQrCode: _pendingRefundCode!,
         manufacturingQrCode: _pendingManufacturingCode,
-        productBarcode: _pendingBarcode,
         isValid: true,
       ));
       return;
@@ -237,7 +243,6 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
           refundQrCode: _pendingRefundCode,
           latitude: _latitude,
           longitude: _longitude,
-          productBarcode: _pendingBarcode,
           initialReason: 'bottle_physically_damaged',
         ),
       ),
@@ -256,8 +261,6 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _results.add(result);
       _pendingRefundCode = null;
       _pendingManufacturingCode = null;
-      _pendingBarcode = null;
-      _secondIsBarcodeMode = false;
       _lastIgnoredCode = null;
       _scanStep = _ScanStep.refund;
     });
@@ -327,9 +330,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     ];
     final String instruction;
     if (_scanStep == _ScanStep.second) {
-      instruction = _secondIsBarcodeMode
-          ? 'Scan the bottle\'s BARCODE'
-          : 'Scan the MANUFACTURING QR of this same bottle';
+      instruction = 'Scan the MANUFACTURING QR of this same bottle';
     } else {
       instruction = 'Scan the REFUND QR code (top of bottle)';
     }
@@ -385,12 +386,12 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
                   textAlign: TextAlign.center,
                 ),
-                if (_scanStep == _ScanStep.second && !_secondIsBarcodeMode) ...[
+                if (_scanStep == _ScanStep.second) ...[
                   const SizedBox(height: 12),
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white)),
-                    onPressed: () => setState(() => _secondIsBarcodeMode = true),
-                    child: const Text('No Manufacturing QR — Scan Barcode'),
+                    onPressed: _rejectMissingManufacturingQr,
+                    child: const Text('No Manufacturing QR — Reject'),
                   ),
                 ],
                 if (_results.isNotEmpty) ...[
@@ -542,11 +543,11 @@ class _CountSelectView extends StatefulWidget {
 class _CountSelectViewState extends State<_CountSelectView> {
   int _count = 1;
 
-  void _set(int value) => setState(() => _count = value.clamp(1, 50));
+  void _set(int value) => setState(() => _count = value.clamp(1, maxBottlesPerBatch));
 
   @override
   Widget build(BuildContext context) {
-    const presets = [1, 3, 5, 10];
+    const presets = [1, 5, 10, maxBottlesPerBatch];
 
     return CenteredScrollView(
       child: Column(

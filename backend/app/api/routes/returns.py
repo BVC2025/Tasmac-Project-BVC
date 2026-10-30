@@ -286,13 +286,23 @@ def complete_return_batch(
     # Re-validate every bottle server-side rather than trusting the client's
     # scan-time results — statuses could have changed since scanning.
     validated: list[Bottle] = []
+    seen_codes: set[str] = set()
     for item in payload.bottles:
+        # Every bottle is still ISSUED until this request commits, so without
+        # this the same bottle listed twice would be paid out twice.
+        if item.refund_qr_code in seen_codes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Bottle {item.refund_qr_code} appears more than once in this batch",
+            )
+        seen_codes.add(item.refund_qr_code)
+
         bottle = db.query(Bottle).filter(Bottle.refund_qr_code == item.refund_qr_code).first()
         if bottle is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Refund QR {item.refund_qr_code} not recognized"
             )
-        if item.manufacturing_qr_code is not None and bottle.manufacturing_qr_code != item.manufacturing_qr_code:
+        if bottle.manufacturing_qr_code != item.manufacturing_qr_code:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Manufacturing QR does not match bottle {item.refund_qr_code}",

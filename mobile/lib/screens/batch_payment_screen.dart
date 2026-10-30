@@ -1,12 +1,13 @@
-import '../widgets/centered_scroll_view.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/centered_scroll_view.dart';
 import 'home_screen.dart';
 import 'scan_bottle_screen.dart';
 
@@ -43,6 +44,9 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
   Timer? _countdownTimer;
   String? _errorMessage;
   Map<String, dynamic>? _result;
+  // Known only when the customer was paid by phone number; for a UPI payment
+  // staff are asked for it when they choose to send the SMS.
+  String? _customerPhone;
 
   int get _amount => widget.bottles.length * 10;
 
@@ -61,6 +65,7 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
     setState(() {
       _step = _PaymentStep.processing;
       _errorMessage = null;
+      _customerPhone = method == 'phone' ? customerIdentifier : null;
     });
     _startCountdown();
 
@@ -72,7 +77,6 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
             {
               'refund_qr_code': bottle.refundQrCode,
               'manufacturing_qr_code': bottle.manufacturingQrCode,
-              'product_barcode': bottle.productBarcode,
             },
         ],
         latitude: widget.latitude,
@@ -258,6 +262,47 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
     );
   }
 
+  /// Opens the device's SMS app with the refund confirmation filled in; staff
+  /// tap Send there. No SMS gateway is involved, so nothing is sent silently.
+  Future<void> _sendSms() async {
+    final phone = _customerPhone ?? await _askCustomerPhone();
+    if (phone == null || phone.isEmpty) return;
+
+    final count = _result?['count'] ?? widget.bottles.length;
+    final amount = _result?['amount'] ?? _amount;
+    final reference = _result?['payment_reference'] ?? '';
+    final message = 'TASMAC Bottle Return: Rs.$amount refund for $count bottle${count == 1 ? '' : 's'} '
+        'has been processed. Ref: $reference. Thank you for recycling!';
+
+    final launched = await launchUrl(Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}'));
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No SMS app found on this device.')));
+    }
+  }
+
+  Future<String?> _askCustomerPhone() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Customer Mobile Number'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Phone Number', prefixIcon: Icon(Icons.phone_outlined)),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _successView() {
     return CenteredScrollView(
       child: Column(
@@ -271,6 +316,12 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
           Text('Amount: ₹${_result?['amount'] ?? _amount}'),
           Text('Reference: ${_result?['payment_reference'] ?? ''}'),
           const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: _sendSms,
+            icon: const Icon(Icons.sms_outlined),
+            label: const Text('Send SMS to Customer'),
+          ),
+          const SizedBox(height: 12),
           FilledButton(
             onPressed: () {
               Navigator.of(context).pushAndRemoveUntil(
