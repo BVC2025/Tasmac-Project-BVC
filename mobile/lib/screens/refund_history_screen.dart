@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/bottle_label.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'return_detail_screen.dart';
@@ -60,7 +61,7 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                 title: Text(item['qr_code'] ?? 'Unknown bottle'),
                 subtitle: Text(
                   // Each bottle is ₹10; payment_amount is the whole batch's payment.
-                  '${item['shop_name']} • ₹10',
+                  [?bottleLabel(item), '${item['shop_name']} • ₹10'].join('\n'),
                 ),
                 trailing: Text(
                   createdAt != null ? '${_shortDate(createdAt)}\n${_shortTime(createdAt)}' : '',

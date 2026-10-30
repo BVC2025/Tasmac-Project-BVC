@@ -20,6 +20,9 @@ class Bottle(TimestampMixin, Base):
     refund_qr_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     manufacturing_qr_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     brand_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # e.g. "Quarter 180 ml", "Half 375 ml", "Full 750 ml" — set when the bottle's
+    # QR pair is provisioned.
+    bottle_size: Mapped[str | None] = mapped_column(String(30), nullable=True)
     status: Mapped[BottleStatus] = mapped_column(Enum(BottleStatus, name="bottle_status"), default=BottleStatus.ISSUED)
 
     return_transactions: Mapped[list["ReturnTransaction"]] = relationship(back_populates="bottle")

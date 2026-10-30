@@ -42,7 +42,10 @@ class ReturnDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _section('Bottle', [
-            _row('QR Code', item['qr_code'] ?? '—'),
+            _row('Refund QR', item['refund_qr_code'] ?? item['qr_code'] ?? '—'),
+            _row('Manufacturing QR', item['manufacturing_qr_code'] ?? '—'),
+            _row('Brand', item['brand_name'] ?? '—'),
+            _row('Size', item['bottle_size'] ?? '—'),
             if ((item['product_barcode'] ?? '').toString().isNotEmpty)
               _row('Product Barcode', item['product_barcode']),
           ]),

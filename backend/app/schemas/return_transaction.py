@@ -43,6 +43,7 @@ class VerifyRefundQrResponse(BaseModel):
     valid: bool
     bottle_id: int
     brand_name: str | None
+    bottle_size: str | None = None
     shop_name: str
     distance_meters: float
 
@@ -55,6 +56,8 @@ class VerifyManufacturingQrRequest(BaseModel):
 class VerifyManufacturingQrResponse(BaseModel):
     valid: bool
     bottle_id: int
+    brand_name: str | None = None
+    bottle_size: str | None = None
 
 
 class LookupManufacturingQrRequest(BaseModel):
@@ -132,7 +135,12 @@ class RejectReturnResponse(BaseModel):
 class ReturnTransactionOut(BaseModel):
     id: int
     bottle_id: int | None
+    # Same as refund_qr_code; kept for older app builds.
     qr_code: str | None
+    refund_qr_code: str | None = None
+    manufacturing_qr_code: str | None = None
+    brand_name: str | None = None
+    bottle_size: str | None = None
     shop_id: int
     shop_name: str
     staff_user_id: int

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../models/bottle_label.dart';
 import '../services/api_service.dart';
 import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
@@ -758,6 +759,13 @@ class _ScanTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w700, fontSize: 15),
                   ),
+                  if (bottleLabel(item) case final bottle?)
+                    Text(
+                      bottle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
                   Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
                 ],
               ),

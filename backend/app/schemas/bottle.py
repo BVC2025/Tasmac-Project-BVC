@@ -8,6 +8,7 @@ class BottleOut(BaseModel):
     refund_qr_code: str
     manufacturing_qr_code: str
     brand_name: str | None
+    bottle_size: str | None
     status: BottleStatus
 
     model_config = ConfigDict(from_attributes=True)

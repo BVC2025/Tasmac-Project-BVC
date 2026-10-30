@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../models/bottle_label.dart';
 import '../services/api_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
@@ -15,12 +16,16 @@ import 'reject_bottle_screen.dart';
 class ScannedBottle {
   final String refundQrCode;
   final String? manufacturingQrCode;
+  final String? brandName;
+  final String? bottleSize;
   final bool isValid;
   final String? rejectReason;
 
   const ScannedBottle({
     required this.refundQrCode,
     this.manufacturingQrCode,
+    this.brandName,
+    this.bottleSize,
     required this.isValid,
     this.rejectReason,
   });
@@ -61,6 +66,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   _ScanStep _scanStep = _ScanStep.refund;
   String? _pendingRefundCode;
   String? _pendingManufacturingCode;
+  Map<String, dynamic>? _pendingBottleInfo; // brand/size from the verify response
   String? _lastIgnoredCode;
   double? _latitude;
   double? _longitude;
@@ -217,13 +223,14 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     setState(() => _scanStep = _ScanStep.busy);
 
     try {
-      await _holdForResult(_apiService.verifyManufacturingQr(
+      final verified = await _holdForResult(_apiService.verifyManufacturingQr(
         widget.token,
         refundQrCode: _pendingRefundCode!,
         manufacturingQrCode: code,
       ));
       setState(() {
         _pendingManufacturingCode = code;
+        _pendingBottleInfo = verified;
         _scanStep = _ScanStep.condition;
       });
       VoiceService.instance.speak(VoiceMessage.manufacturingVerified);
@@ -262,6 +269,8 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _finishBottle(ScannedBottle(
         refundQrCode: _pendingRefundCode!,
         manufacturingQrCode: _pendingManufacturingCode,
+        brandName: _pendingBottleInfo?['brand_name'] as String?,
+        bottleSize: _pendingBottleInfo?['bottle_size'] as String?,
         isValid: true,
       ));
       return;
@@ -295,6 +304,7 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
       _results.add(result);
       _pendingRefundCode = null;
       _pendingManufacturingCode = null;
+      _pendingBottleInfo = null;
       _lastIgnoredCode = null;
       _scanStep = _ScanStep.refund;
     });
@@ -467,6 +477,10 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
             'Bottle ${_results.length + 1} — codes verified ✓',
             style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
           ),
+          if (bottleLabel(_pendingBottleInfo) case final label?) ...[
+            const SizedBox(height: 6),
+            Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700), textAlign: TextAlign.center),
+          ],
           const SizedBox(height: 16),
           const Text(
             'Check the physical bottle condition',
@@ -530,7 +544,9 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
                 ),
                 title: Text('Bottle ${index + 1}'),
                 subtitle: Text(
-                  bottle.isValid ? bottle.refundQrCode : (bottle.rejectReason ?? 'rejected').replaceAll('_', ' '),
+                  bottle.isValid
+                      ? [bottle.refundQrCode, ?bottleLabelOf(bottle.brandName, bottle.bottleSize)].join('\n')
+                      : (bottle.rejectReason ?? 'rejected').replaceAll('_', ' '),
                 ),
                 trailing: Text(bottle.isValid ? '₹10' : '—'),
               );

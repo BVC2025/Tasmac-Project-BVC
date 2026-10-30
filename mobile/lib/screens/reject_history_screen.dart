@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/bottle_label.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import 'return_detail_screen.dart';
@@ -59,7 +60,10 @@ class _RejectHistoryScreenState extends State<RejectHistoryScreen> {
                 leading: const Icon(Icons.cancel, color: AppColors.brandRed),
                 title: Text(item['qr_code'] ?? 'Unknown bottle'),
                 subtitle: Text(
-                  (item['rejection_reason'] ?? 'Unknown reason').toString().replaceAll('_', ' '),
+                  [
+                    ?bottleLabel(item),
+                    (item['rejection_reason'] ?? 'Unknown reason').toString().replaceAll('_', ' '),
+                  ].join('\n'),
                 ),
                 trailing: Text(
                   createdAt != null ? '${_shortDate(createdAt)}\n${_shortTime(createdAt)}' : '',

@@ -94,11 +94,16 @@ def _to_out(transaction: ReturnTransaction) -> ReturnTransactionOut:
         )
 
     payment = transaction.payment
+    bottle = transaction.bottle
 
     return ReturnTransactionOut(
         id=transaction.id,
         bottle_id=transaction.bottle_id,
-        qr_code=transaction.bottle.refund_qr_code if transaction.bottle else None,
+        qr_code=bottle.refund_qr_code if bottle else None,
+        refund_qr_code=bottle.refund_qr_code if bottle else None,
+        manufacturing_qr_code=bottle.manufacturing_qr_code if bottle else None,
+        brand_name=bottle.brand_name if bottle else None,
+        bottle_size=bottle.bottle_size if bottle else None,
         shop_id=transaction.shop_id,
         shop_name=transaction.shop.name,
         staff_user_id=transaction.staff_user_id,
@@ -153,6 +158,7 @@ def verify_refund_qr(
         valid=True,
         bottle_id=bottle.id,
         brand_name=bottle.brand_name,
+        bottle_size=bottle.bottle_size,
         shop_name=shop.name,
         distance_meters=round(distance, 1),
     )
@@ -182,7 +188,9 @@ def verify_manufacturing_qr(
     )
     db.commit()
 
-    return VerifyManufacturingQrResponse(valid=True, bottle_id=bottle.id)
+    return VerifyManufacturingQrResponse(
+        valid=True, bottle_id=bottle.id, brand_name=bottle.brand_name, bottle_size=bottle.bottle_size
+    )
 
 
 @router.post("/lookup-manufacturing-qr", response_model=LookupManufacturingQrResponse)
@@ -345,7 +353,22 @@ def complete_return_batch(
     log_action(
         db=db, user_id=current_user.id, action="complete_return_batch", entity_type="payment",
         entity_id=payment.id,
-        extra_data={"bottle_count": len(validated), "payment_success": payment_success, "reference_id": reference_id},
+        extra_data={
+            "bottle_count": len(validated),
+            "payment_success": payment_success,
+            "reference_id": reference_id,
+            # Which physical bottles this payment covered, readable straight
+            # from the audit log without joining tables.
+            "bottles": [
+                {
+                    "refund_qr_code": b.refund_qr_code,
+                    "manufacturing_qr_code": b.manufacturing_qr_code,
+                    "brand_name": b.brand_name,
+                    "bottle_size": b.bottle_size,
+                }
+                for b in validated
+            ],
+        },
     )
 
     db.commit()

@@ -24,11 +24,12 @@ def generate_unique_code(db: Session, prefix: str) -> str:
     raise RuntimeError("Could not generate a unique QR code")
 
 
-def new_bottle(db: Session, brand_name: str | None = None) -> Bottle:
+def new_bottle(db: Session, brand_name: str | None = None, bottle_size: str | None = None) -> Bottle:
     """Not exposed over the API — bottle records are provisioned out-of-band
     (see scripts/generate_bottles.py), never by staff or admin through the app."""
     return Bottle(
         refund_qr_code=generate_unique_code(db, REFUND_PREFIX),
         manufacturing_qr_code=generate_unique_code(db, MANUFACTURING_PREFIX),
         brand_name=brand_name,
+        bottle_size=bottle_size,
     )
