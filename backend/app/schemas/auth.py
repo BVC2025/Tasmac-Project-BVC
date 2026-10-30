@@ -1,9 +1,18 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LoginRequest(BaseModel):
     user_id: str
     password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    user_id: str = Field(min_length=1, max_length=50)
+    message: str | None = Field(default=None, max_length=200)
+
+
+class ForgotPasswordResponse(BaseModel):
+    detail: str
 
 
 class TokenResponse(BaseModel):

@@ -47,6 +47,9 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
   // Known only when the customer was paid by phone number; for a UPI payment
   // staff are asked for it when they choose to send the SMS.
   String? _customerPhone;
+  // Done stays locked until the customer has been sent the refund SMS (or
+  // staff explicitly skip it, e.g. the customer has no phone).
+  bool _smsDone = false;
 
   int get _amount => widget.bottles.length * 10;
 
@@ -274,8 +277,16 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
     final message = 'TASMAC Bottle Return: Rs.$amount refund for $count bottle${count == 1 ? '' : 's'} '
         'has been processed. Ref: $reference. Thank you for recycling!';
 
-    final launched = await launchUrl(Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}'));
-    if (!launched && mounted) {
+    bool launched;
+    try {
+      launched = await launchUrl(Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}'));
+    } catch (_) {
+      launched = false;
+    }
+    if (!mounted) return;
+    if (launched) {
+      setState(() => _smsDone = true);
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No SMS app found on this device.')));
     }
   }
@@ -316,21 +327,40 @@ class _BatchPaymentScreenState extends State<BatchPaymentScreen> {
           Text('Amount: ₹${_result?['amount'] ?? _amount}'),
           Text('Reference: ${_result?['payment_reference'] ?? ''}'),
           const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: _sendSms,
-            icon: const Icon(Icons.sms_outlined),
-            label: const Text('Send SMS to Customer'),
+          SizedBox(
+            width: double.infinity,
+            child: _smsDone
+                ? OutlinedButton.icon(
+                    onPressed: _sendSms,
+                    icon: const Icon(Icons.check_circle, color: Colors.green),
+                    label: const Text('SMS sent — Send Again'),
+                  )
+                : FilledButton.icon(
+                    onPressed: _sendSms,
+                    icon: const Icon(Icons.sms_outlined),
+                    label: const Text('Send SMS to Customer'),
+                  ),
           ),
           const SizedBox(height: 12),
-          FilledButton(
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => HomeScreen(user: widget.user, token: widget.token)),
-                (route) => false,
-              );
-            },
-            child: const Text('Done'),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _smsDone
+                  ? () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => HomeScreen(user: widget.user, token: widget.token)),
+                        (route) => false,
+                      );
+                    }
+                  : null,
+              child: const Text('Done'),
+            ),
           ),
+          if (!_smsDone)
+            TextButton(
+              onPressed: () => setState(() => _smsDone = true),
+              child: const Text('Skip SMS (customer has no phone)'),
+            ),
         ],
       ),
     );

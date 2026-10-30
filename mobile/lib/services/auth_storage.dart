@@ -35,4 +35,22 @@ class AuthStorage {
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
   }
+
+  // "Remember Me" on the login screen: keeps the User ID filled in for next
+  // time (surviving logout) in addition to keeping the session itself.
+  static const _rememberedUserIdKey = 'remembered_user_id';
+
+  static Future<String?> loadRememberedUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_rememberedUserIdKey);
+  }
+
+  static Future<void> setRememberedUserId(String? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (userId == null) {
+      await prefs.remove(_rememberedUserIdKey);
+    } else {
+      await prefs.setString(_rememberedUserIdKey, userId);
+    }
+  }
 }

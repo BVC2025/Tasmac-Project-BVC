@@ -7,6 +7,7 @@ import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
 import '../widgets/centered_scroll_view.dart';
+import '../widgets/confirm_logout.dart';
 import 'home_screen.dart';
 import 'login_screen.dart';
 
@@ -92,6 +93,7 @@ class _LocationGateScreenState extends State<LocationGateScreen> {
   }
 
   Future<void> _logout() async {
+    if (!await confirmLogout(context)) return;
     await AuthStorage.clear();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(

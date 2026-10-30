@@ -24,6 +24,18 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = true;
   String? _errorMessage;
 
+  @override
+  void initState() {
+    super.initState();
+    _restoreRememberedUserId();
+  }
+
+  Future<void> _restoreRememberedUserId() async {
+    final userId = await AuthStorage.loadRememberedUserId();
+    if (!mounted || userId == null) return;
+    setState(() => _userIdController.text = userId);
+  }
+
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -40,10 +52,15 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = result['access_token'] as String;
       final user = await _apiService.getCurrentUser(token);
 
+      // Remember Me: stay signed in across app restarts and keep the User ID
+      // filled in after logout. Unchecked: nothing is kept on this device —
+      // useful on a shared handheld.
       if (_rememberMe) {
         await AuthStorage.save(token, user);
+        await AuthStorage.setRememberedUserId(_userIdController.text.trim());
       } else {
         await AuthStorage.clear();
+        await AuthStorage.setRememberedUserId(null);
       }
 
       if (!mounted) return;
@@ -71,10 +88,67 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _forgotPassword() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Contact your admin to reset your password.')),
+  Future<void> _forgotPassword() async {
+    final userIdController = TextEditingController(text: _userIdController.text.trim());
+    final messageController = TextEditingController();
+
+    final send = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Forgot Password'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Your admin will get a request to reset your password and will share the new one with you.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: userIdController,
+                decoration: const InputDecoration(labelText: 'Your User ID', prefixIcon: Icon(Icons.badge_outlined)),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: messageController,
+                maxLength: 200,
+                decoration: const InputDecoration(labelText: 'Message to admin (optional)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Send Request')),
+        ],
+      ),
     );
+
+    final userId = userIdController.text.trim();
+    if (send != true) return;
+    if (userId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your User ID to send the request.')));
+      return;
+    }
+
+    try {
+      final confirmation = await _apiService.requestPasswordReset(userId, message: messageController.text.trim());
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          icon: const Icon(Icons.mark_email_read_outlined, color: AppColors.primaryGreen),
+          title: const Text('Request Sent'),
+          content: Text(confirmation),
+          actions: [FilledButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('OK'))],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   @override

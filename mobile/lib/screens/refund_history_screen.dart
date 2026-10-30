@@ -59,7 +59,8 @@ class _RefundHistoryScreenState extends State<RefundHistoryScreen> {
                 leading: const Icon(Icons.check_circle, color: Colors.green),
                 title: Text(item['qr_code'] ?? 'Unknown bottle'),
                 subtitle: Text(
-                  '${item['shop_name']} • ₹${item['payment_amount'] ?? '10'}',
+                  // Each bottle is ₹10; payment_amount is the whole batch's payment.
+                  '${item['shop_name']} • ₹10',
                 ),
                 trailing: Text(
                   createdAt != null ? '${_shortDate(createdAt)}\n${_shortTime(createdAt)}' : '',

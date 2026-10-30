@@ -173,6 +173,49 @@ class ApiService {
     throw ApiException(_errorMessage(response, 'Could not reset password'));
   }
 
+  /// Sends a "forgot password" request to the admins. Returns the backend's
+  /// confirmation text, which is the same whether or not the User ID exists.
+  Future<String> requestPasswordReset(String userId, {String? message}) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'user_id': userId, if (message != null && message.isNotEmpty) 'message': message}),
+      ),
+    );
+
+    if (response.statusCode == 202) {
+      return (jsonDecode(response.body) as Map<String, dynamic>)['detail'] as String;
+    }
+
+    throw ApiException(_errorMessage(response, 'Could not send the request'));
+  }
+
+  Future<List<dynamic>> listPasswordResetRequests(String token) async {
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl/staff/password-reset-requests'), headers: _authHeaders(token)),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+
+    throw ApiException(_errorMessage(response, 'Could not load password requests'));
+  }
+
+  Future<void> dismissPasswordResetRequest(String token, int staffId) async {
+    final response = await _send(
+      () => http.post(
+        Uri.parse('$baseUrl/staff/$staffId/password-reset-requests/dismiss'),
+        headers: _authHeaders(token),
+      ),
+    );
+
+    if (response.statusCode != 204) {
+      throw ApiException(_errorMessage(response, 'Could not dismiss the request'));
+    }
+  }
+
   Future<Map<String, dynamic>> deactivateStaff(String token, int staffId) async {
     final response = await _send(
       () => http.delete(Uri.parse('$baseUrl/staff/$staffId'), headers: _authHeaders(token)),

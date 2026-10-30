@@ -9,7 +9,8 @@ from app.api.deps import get_current_admin_user, get_current_user
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User, UserRole
-from app.schemas.staff import ResetPasswordRequest, StaffCreate, StaffOut, StaffUpdate
+from app.schemas.staff import PasswordResetRequestOut, ResetPasswordRequest, StaffCreate, StaffOut, StaffUpdate
+from app.services import password_reset
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
@@ -51,6 +52,28 @@ def create_staff(payload: StaffCreate, db: Session = Depends(get_db)):
     return user
 
 
+# Declared before "/{staff_id}" so the literal path isn't captured as an id.
+@router.get(
+    "/password-reset-requests",
+    response_model=list[PasswordResetRequestOut],
+    dependencies=[Depends(get_current_admin_user)],
+)
+def list_password_reset_requests(db: Session = Depends(get_db)):
+    return [
+        PasswordResetRequestOut(staff=StaffOut.model_validate(user), requested_at=requested_at, message=message)
+        for user, requested_at, message in password_reset.list_open_requests(db)
+    ]
+
+
+@router.post("/{staff_id}/password-reset-requests/dismiss", status_code=status.HTTP_204_NO_CONTENT)
+def dismiss_password_reset_request(
+    staff_id: int, admin_user: User = Depends(get_current_admin_user), db: Session = Depends(get_db)
+):
+    if password_reset.open_request(db, staff_id) is not None:
+        password_reset.resolve(db, admin_id=admin_user.id, user_id=staff_id, action=password_reset.DISMISSED)
+        db.commit()
+
+
 @router.get("/{staff_id}", response_model=StaffOut, dependencies=[Depends(get_current_admin_user)])
 def get_staff(staff_id: int, db: Session = Depends(get_db)):
     user = db.get(User, staff_id)
@@ -73,13 +96,20 @@ def update_staff(staff_id: int, payload: StaffUpdate, db: Session = Depends(get_
     return user
 
 
-@router.post("/{staff_id}/reset-password", response_model=StaffOut, dependencies=[Depends(get_current_admin_user)])
-def reset_password(staff_id: int, payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+@router.post("/{staff_id}/reset-password", response_model=StaffOut)
+def reset_password(
+    staff_id: int,
+    payload: ResetPasswordRequest,
+    admin_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+):
     user = db.get(User, staff_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
 
     user.hashed_password = hash_password(payload.new_password)
+    # Also closes any open "forgot password" request from this user.
+    password_reset.resolve(db, admin_id=admin_user.id, user_id=user.id, action=password_reset.RESET_BY_ADMIN)
     db.commit()
     db.refresh(user)
     return user

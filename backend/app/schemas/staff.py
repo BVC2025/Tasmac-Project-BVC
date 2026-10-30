@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 from app.models.user import UserRole
@@ -36,3 +38,9 @@ class StaffOut(BaseModel):
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class PasswordResetRequestOut(BaseModel):
+    staff: StaffOut
+    requested_at: datetime
+    message: str | None

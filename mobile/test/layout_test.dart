@@ -17,6 +17,7 @@ import 'package:tasmac_bottle_return/screens/geofence_lost_screen.dart';
 import 'package:tasmac_bottle_return/screens/home_screen.dart';
 import 'package:tasmac_bottle_return/screens/location_gate_screen.dart';
 import 'package:tasmac_bottle_return/screens/login_screen.dart';
+import 'package:tasmac_bottle_return/screens/password_requests_screen.dart';
 import 'package:tasmac_bottle_return/screens/refund_history_screen.dart';
 import 'package:tasmac_bottle_return/screens/reject_bottle_screen.dart';
 import 'package:tasmac_bottle_return/screens/reject_history_screen.dart';
@@ -71,8 +72,10 @@ http.Client _fakeBackend() => MockClient((request) async {
             {
               ..._returnItem,
               'id': i,
-              'status': i.isEven ? 'returned' : 'rejected',
+              'status': i.isEven ? 'verified' : 'rejected',
               'payment_amount': 10,
+              // The first few are from today, so the home stats aren't empty.
+              if (i < 4) 'created_at': DateTime.now().toUtc().toIso8601String(),
             },
         ];
       } else if (path == '/shops') {
@@ -86,6 +89,21 @@ http.Client _fakeBackend() => MockClient((request) async {
               'is_active': i != 3,
               'service_start_time': '10:00:00',
               'service_end_time': '22:00:00',
+            },
+        ];
+      } else if (path == '/staff/password-reset-requests') {
+        body = [
+          for (var i = 0; i < 3; i++)
+            {
+              'staff': {
+                'id': i,
+                'full_name': 'Murugan Selvaraj Krishnamoorthy $i',
+                'user_id': 'STAFF00$i',
+                'phone_number': '98765432$i$i',
+                'shop_name': 'TASMAC Outlet 4521 — Anna Nagar West Extension',
+              },
+              'requested_at': '2026-10-21T10:15:00Z',
+              'message': 'Forgot my password after the phone was reset, please help.',
             },
         ];
       } else if (path == '/staff') {
@@ -164,6 +182,7 @@ final _cases = <_Case>[
   _Case('Reject history', (_) => const RejectHistoryScreen(token: 't')),
   _Case('Shop list', (_) => const ShopListScreen(token: 't')),
   _Case('Staff list', (_) => const StaffListScreen(token: 't')),
+  _Case('Password requests', (_) => const PasswordRequestsScreen(token: 't')),
   _Case('Add shop', (_) => const AddShopScreen(token: 't')),
   _Case('Add shop + keyboard', (_) => const AddShopScreen(token: 't'), keyboard: true),
   _Case('Add staff', (_) => const AddStaffScreen(token: 't')),

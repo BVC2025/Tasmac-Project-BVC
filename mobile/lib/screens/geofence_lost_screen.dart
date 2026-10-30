@@ -4,6 +4,7 @@ import '../services/auth_storage.dart';
 import '../services/geofence_monitor.dart';
 import '../theme/app_colors.dart';
 import '../widgets/centered_scroll_view.dart';
+import '../widgets/confirm_logout.dart';
 import 'login_screen.dart';
 
 /// Blocks the entire app when a background check finds the device has moved
@@ -31,6 +32,7 @@ class _GeofenceLostScreenState extends State<GeofenceLostScreen> {
   }
 
   Future<void> _logout() async {
+    if (!await confirmLogout(context)) return;
     GeofenceMonitor.instance.stop();
     await AuthStorage.clear();
     if (!mounted) return;

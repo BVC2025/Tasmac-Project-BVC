@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
+import '../widgets/reset_password_dialog.dart';
 import 'add_staff_screen.dart';
 
 class StaffListScreen extends StatefulWidget {
@@ -35,51 +36,6 @@ class _StaffListScreenState extends State<StaffListScreen> {
     try {
       await _apiService.deactivateStaff(widget.token, staffId);
       _refresh();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
-  }
-
-  Future<void> _resetPassword(int staffId, String staffName) async {
-    final controller = TextEditingController();
-    bool obscure = true;
-
-    final newPassword = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text('Reset password — $staffName'),
-          content: TextField(
-            controller: controller,
-            obscureText: obscure,
-            decoration: InputDecoration(
-              labelText: 'New password',
-              suffixIcon: IconButton(
-                icon: Icon(obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                onPressed: () => setDialogState(() => obscure = !obscure),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(controller.text),
-              child: const Text('Reset'),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    if (newPassword == null || newPassword.isEmpty) return;
-
-    try {
-      await _apiService.resetStaffPassword(widget.token, staffId, newPassword);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Password reset for $staffName. Share the new password with them securely.')),
-      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
@@ -139,7 +95,12 @@ class _StaffListScreenState extends State<StaffListScreen> {
                           IconButton(
                             icon: const Icon(Icons.key, color: Colors.blueGrey),
                             tooltip: 'Reset password',
-                            onPressed: () => _resetPassword(member['id'] as int, member['full_name'] ?? ''),
+                            onPressed: () => showResetPasswordDialog(
+                              context,
+                              token: widget.token,
+                              staffId: member['id'] as int,
+                              staffName: member['full_name'] ?? '',
+                            ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.block, color: Colors.red),
