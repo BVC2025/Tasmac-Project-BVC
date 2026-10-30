@@ -35,6 +35,10 @@ enum _ScanStep { refund, second, condition, busy }
 /// Upper bound for one customer's batch; the backend enforces the same limit.
 const maxBottlesPerBatch = 20;
 
+/// How long each scanned QR shows "Checking QR…" before its valid/invalid
+/// result appears.
+const scanResultDelay = Duration(seconds: 5);
+
 class ScanBottleScreen extends StatefulWidget {
   final String token;
   final Map<String, dynamic> user;
@@ -47,7 +51,9 @@ class ScanBottleScreen extends StatefulWidget {
 
 class _ScanBottleScreenState extends State<ScanBottleScreen> {
   final _apiService = ApiService();
-  final MobileScannerController _controller = MobileScannerController();
+  // Our bottle codes are always QR codes; ignoring every other symbology means
+  // product barcodes, price stickers etc. in frame are never even reported.
+  final MobileScannerController _controller = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
 
   _Phase _phase = _Phase.selectCount;
   int _targetCount = 5;
@@ -97,6 +103,21 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     });
   }
 
+  /// Runs [verification] but only completes once [scanResultDelay] has passed,
+  /// so staff see a steady "Checking QR…" instead of an instant verdict that
+  /// can flash past while the bottle is still being positioned.
+  Future<T> _holdForResult<T>(Future<T> verification) async {
+    final hold = Future<void>.delayed(scanResultDelay);
+    try {
+      final result = await verification;
+      await hold;
+      return result;
+    } catch (_) {
+      await hold;
+      rethrow;
+    }
+  }
+
   void _handleDetect(BarcodeCapture capture) {
     if (_scanStep == _ScanStep.busy) return;
     if (capture.barcodes.isEmpty) return;
@@ -112,6 +133,19 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   }
 
   Future<void> _handleRefundDetect(String code) async {
+    // Only our own refund QRs count. Any other QR in frame (a manufacturing
+    // QR, a UPI sticker, an unrelated code) is ignored — the camera keeps
+    // waiting — instead of being sent to the server and rejecting the bottle.
+    if (!code.startsWith('TSM-R-')) {
+      if (code != _lastIgnoredCode) {
+        _lastIgnoredCode = code;
+        _showSnack(code.startsWith('TSM-M-')
+            ? 'That is the MANUFACTURING QR — scan the REFUND QR (front of bottle) first.'
+            : 'Not a TASMAC refund QR — ignored. Scan the REFUND QR on the bottle.');
+      }
+      return;
+    }
+
     // One QR, one refund: the backend still sees this bottle as unused until
     // the batch is paid, so a repeat scan within the batch must be caught here.
     if (_results.any((b) => b.refundQrCode == code)) {
@@ -127,12 +161,12 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     try {
       await _ensureLocation();
 
-      await _apiService.verifyRefundQr(
+      await _holdForResult(_apiService.verifyRefundQr(
         widget.token,
         refundQrCode: code,
         latitude: _latitude!,
         longitude: _longitude!,
-      );
+      ));
 
       setState(() {
         _pendingRefundCode = code;
@@ -183,11 +217,11 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
     setState(() => _scanStep = _ScanStep.busy);
 
     try {
-      await _apiService.verifyManufacturingQr(
+      await _holdForResult(_apiService.verifyManufacturingQr(
         widget.token,
         refundQrCode: _pendingRefundCode!,
         manufacturingQrCode: code,
-      );
+      ));
       setState(() {
         _pendingManufacturingCode = code;
         _scanStep = _ScanStep.condition;
@@ -370,7 +404,19 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
         if (_scanStep == _ScanStep.busy)
           Container(
             color: Colors.black45,
-            child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 16),
+                  Text(
+                    'Checking QR… hold the bottle steady',
+                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
           ),
         Align(
           alignment: Alignment.bottomCenter,
