@@ -57,6 +57,46 @@ class _ShopListScreenState extends State<ShopListScreen> {
     }
   }
 
+  Future<void> _editRadius(Map<String, dynamic> shop) async {
+    final controller = TextEditingController(text: '${shop['geofence_radius_meters'] ?? 150}');
+    final radius = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Service radius — ${shop['name']}'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Radius (metres)',
+            helperText: 'Staff must be within this distance of the shop (10–1000 m)',
+            suffixText: 'm',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              final value = int.tryParse(controller.text.trim());
+              if (value == null || value < 10 || value > 1000) return;
+              Navigator.of(dialogContext).pop(value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (radius == null) return;
+
+    try {
+      await _apiService.updateShopRadius(widget.token, shop['id'] as int, radius);
+      _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
   String? _formatTime(TimeOfDay? time) {
     if (time == null) return null;
     final hour = time.hour.toString().padLeft(2, '0');
@@ -195,7 +235,8 @@ class _ShopListScreenState extends State<ShopListScreen> {
                 ),
                 title: Text(shop['name'] ?? ''),
                 subtitle: Text(
-                  '${shop['shop_code']}${shop['address'] != null ? ' • ${shop['address']}' : ''} • $hoursLabel',
+                  '${shop['shop_code']}${shop['address'] != null ? ' • ${shop['address']}' : ''} • $hoursLabel'
+                  ' • ${shop['geofence_radius_meters'] ?? 150} m radius',
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -214,6 +255,10 @@ class _ShopListScreenState extends State<ShopListScreen> {
                         tooltip: 'More options',
                         onSelected: (_) {},
                         itemBuilder: (context) => [
+                          PopupMenuItem<void>(
+                            onTap: () => _editRadius(shop),
+                            child: const Text('Set service radius'),
+                          ),
                           PopupMenuItem<void>(
                             onTap: () => _confirmDeactivate(shop),
                             child: const Text('Deactivate Shop', style: TextStyle(color: Colors.red)),

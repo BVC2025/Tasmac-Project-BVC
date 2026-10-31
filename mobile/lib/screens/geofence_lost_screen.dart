@@ -69,10 +69,10 @@ class _GeofenceLostScreenState extends State<GeofenceLostScreen> {
                   style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'Return to your shop\'s 100m service area to continue. This checks automatically.',
+                Text(
+                  'Return to your shop\'s ${widget.result['radius_meters']} m service area to continue. This checks automatically.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
                 ),
                 const SizedBox(height: 28),
                 FilledButton.icon(

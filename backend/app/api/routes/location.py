@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.deps import get_current_user
-from app.core.geo import GEOFENCE_RADIUS_METERS, haversine_distance_meters
+from app.core.geo import haversine_distance_meters
 from app.models.user import User
 from app.schemas.location import LocationCheckRequest, LocationCheckResponse
 from app.services.shop_access import ensure_within_service_window
@@ -29,6 +29,6 @@ def verify_location(payload: LocationCheckRequest, current_user: User = Depends(
         shop_id=shop.id,
         shop_name=shop.name,
         distance_meters=round(distance, 1),
-        radius_meters=GEOFENCE_RADIUS_METERS,
-        within_range=distance <= GEOFENCE_RADIUS_METERS,
+        radius_meters=shop.geofence_radius_meters,
+        within_range=distance <= shop.geofence_radius_meters,
     )

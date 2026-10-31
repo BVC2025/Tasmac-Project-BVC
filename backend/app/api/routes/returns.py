@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
-from app.core.geo import GEOFENCE_RADIUS_METERS, haversine_distance_meters
+from app.core.geo import haversine_distance_meters
 from app.db.session import get_db
 from app.models.bottle import Bottle, BottleStatus
 from app.models.payment import Payment, PaymentMethod, PaymentStatus
@@ -49,10 +49,11 @@ def _check_access(current_user: User, latitude: float, longitude: float) -> tupl
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your shop has no registered location")
 
     distance = haversine_distance_meters(latitude, longitude, float(shop.latitude), float(shop.longitude))
-    if distance > GEOFENCE_RADIUS_METERS:
+    radius = shop.geofence_radius_meters
+    if distance > radius:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"You are {round(distance)}m from {shop.name} — must be within {GEOFENCE_RADIUS_METERS}m to proceed",
+            detail=f"You are {round(distance)}m from {shop.name} — must be within {radius}m to proceed",
         )
 
     return shop, distance

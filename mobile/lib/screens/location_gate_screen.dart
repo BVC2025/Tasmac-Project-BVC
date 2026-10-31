@@ -201,7 +201,7 @@ class _LocationGateScreenState extends State<LocationGateScreen> {
 
     final String headline;
     if (outside) {
-      headline = 'You are outside the shop\'s 100 m service area';
+      headline = 'You are outside the shop\'s ${_result?['radius_meters'] ?? ''} m service area';
     } else if (fix == null) {
       headline = 'Getting your GPS location…';
     } else if (fix.accuracy > LocationService.trustedAccuracyMeters) {

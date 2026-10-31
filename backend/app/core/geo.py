@@ -1,7 +1,11 @@
 import math
 
 EARTH_RADIUS_METERS = 6_371_000
-GEOFENCE_RADIUS_METERS = 100
+# Used for shops created before per-shop radii existed; admins can change
+# each shop's radius (Shop.geofence_radius_meters) in Manage Shops.
+DEFAULT_GEOFENCE_RADIUS_METERS = 150
+MIN_GEOFENCE_RADIUS_METERS = 10
+MAX_GEOFENCE_RADIUS_METERS = 1000
 
 
 def haversine_distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

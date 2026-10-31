@@ -42,6 +42,8 @@ def update_shop(shop_id: int, payload: ShopUpdate, db: Session = Depends(get_db)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shop not found")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
+        if field == "geofence_radius_meters" and value is None:
+            continue  # the column is required; an explicit null means "leave as is"
         setattr(shop, field, value)
 
     db.commit()

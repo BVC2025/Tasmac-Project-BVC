@@ -52,16 +52,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final token = result['access_token'] as String;
       final user = await _apiService.getCurrentUser(token);
 
-      // Remember Me: stay signed in across app restarts and keep the User ID
-      // filled in after logout. Unchecked: nothing is kept on this device —
-      // useful on a shared handheld.
-      if (_rememberMe) {
-        await AuthStorage.save(token, user);
-        await AuthStorage.setRememberedUserId(_userIdController.text.trim());
-      } else {
-        await AuthStorage.clear();
-        await AuthStorage.setRememberedUserId(null);
-      }
+      // The app always starts at this login page, so no session is kept on
+      // the device. Remember Me only keeps the User ID filled in for next
+      // time; unchecked, nothing is kept — useful on a shared handheld.
+      await AuthStorage.clear();
+      await AuthStorage.setRememberedUserId(_rememberMe ? _userIdController.text.trim() : null);
 
       if (!mounted) return;
 

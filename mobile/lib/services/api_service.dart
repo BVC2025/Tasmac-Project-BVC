@@ -259,6 +259,7 @@ class ApiService {
     String? address,
     double? latitude,
     double? longitude,
+    int? geofenceRadiusMeters,
     String? serviceStartTime,
     String? serviceEndTime,
   }) async {
@@ -272,6 +273,7 @@ class ApiService {
           'address': address,
           'latitude': latitude,
           'longitude': longitude,
+          'geofence_radius_meters': ?geofenceRadiusMeters,
           'service_start_time': serviceStartTime,
           'service_end_time': serviceEndTime,
         }),
@@ -286,6 +288,22 @@ class ApiService {
   }
 
   /// Pass `HH:mm` strings for the time fields, or null to clear the restriction.
+  Future<Map<String, dynamic>> updateShopRadius(String token, int shopId, int radiusMeters) async {
+    final response = await _send(
+      () => http.patch(
+        Uri.parse('$baseUrl/shops/$shopId'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({'geofence_radius_meters': radiusMeters}),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_errorMessage(response, 'Could not update service radius'));
+  }
+
   Future<Map<String, dynamic>> updateShopServiceWindow(
     String token,
     int shopId, {

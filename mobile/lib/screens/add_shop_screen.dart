@@ -19,6 +19,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
   final _addressController = TextEditingController();
   final _latController = TextEditingController();
   final _lngController = TextEditingController();
+  final _radiusController = TextEditingController(text: '150');
   final _apiService = ApiService();
 
   bool _isSaving = false;
@@ -64,6 +65,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
         address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
         latitude: _latController.text.trim().isEmpty ? null : double.tryParse(_latController.text.trim()),
         longitude: _lngController.text.trim().isEmpty ? null : double.tryParse(_lngController.text.trim()),
+        geofenceRadiusMeters: int.parse(_radiusController.text.trim()),
         serviceStartTime: _formatTime(_serviceStart),
         serviceEndTime: _formatTime(_serviceEnd),
       );
@@ -89,6 +91,7 @@ class _AddShopScreenState extends State<AddShopScreen> {
     _addressController.dispose();
     _latController.dispose();
     _lngController.dispose();
+    _radiusController.dispose();
     super.dispose();
   }
 
@@ -139,6 +142,21 @@ class _AddShopScreenState extends State<AddShopScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _radiusController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Service radius (metres)',
+                  helperText: 'Staff must be within this distance of the shop (10–1000 m)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  final radius = int.tryParse(value?.trim() ?? '');
+                  if (radius == null || radius < 10 || radius > 1000) return 'Enter a whole number from 10 to 1000';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               const Align(

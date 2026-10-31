@@ -3,6 +3,7 @@ from datetime import time
 from sqlalchemy import Numeric, String, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.geo import DEFAULT_GEOFENCE_RADIUS_METERS
 from app.db.base import Base
 from app.db.mixins import TimestampMixin
 
@@ -17,6 +18,11 @@ class Shop(TimestampMixin, Base):
     latitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(9, 6), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # How far (metres) from latitude/longitude staff may be and still count
+    # as "at the shop". Set by admin per shop.
+    geofence_radius_meters: Mapped[int] = mapped_column(
+        default=DEFAULT_GEOFENCE_RADIUS_METERS, server_default=str(DEFAULT_GEOFENCE_RADIUS_METERS)
+    )
 
     # Null start/end = no time-of-day restriction for this shop
     service_start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
