@@ -16,6 +16,7 @@ import 'package:tasmac_bottle_return/screens/batch_payment_screen.dart';
 import 'package:tasmac_bottle_return/screens/geofence_lost_screen.dart';
 import 'package:tasmac_bottle_return/screens/home_screen.dart';
 import 'package:tasmac_bottle_return/screens/location_gate_screen.dart';
+import 'package:tasmac_bottle_return/screens/forgot_password_screen.dart';
 import 'package:tasmac_bottle_return/screens/login_screen.dart';
 import 'package:tasmac_bottle_return/screens/password_requests_screen.dart';
 import 'package:tasmac_bottle_return/screens/refund_history_screen.dart';
@@ -70,7 +71,7 @@ final _returnItem = <String, dynamic>{
 http.Client _fakeBackend() => MockClient((request) async {
       final path = request.url.path;
       Object body;
-      if (path == '/returns/mine') {
+      if (path == '/returns/mine' || path == '/returns') {
         body = [
           for (var i = 0; i < 12; i++)
             {
@@ -187,6 +188,11 @@ final _cases = <_Case>[
   _Case('Shop list', (_) => const ShopListScreen(token: 't')),
   _Case('Staff list', (_) => const StaffListScreen(token: 't')),
   _Case('Password requests', (_) => const PasswordRequestsScreen(token: 't')),
+  _Case('Forgot password', (_) => const ForgotPasswordScreen(initialUserId: 'Staff001')),
+  _Case('Forgot password + keyboard', (_) => const ForgotPasswordScreen(), keyboard: true),
+  _Case('Edit staff', (_) => AddStaffScreen(token: 't', staff: {..._staffUser, 'phone_number': '9876543210', 'shop_id': 1})),
+  _Case('Refunds (admin, all shops)', (_) => const RefundHistoryScreen(token: 't', allShops: true)),
+  _Case('Rejections (admin, all shops)', (_) => const RejectHistoryScreen(token: 't', allShops: true)),
   _Case('Add shop', (_) => const AddShopScreen(token: 't')),
   _Case('Add shop + keyboard', (_) => const AddShopScreen(token: 't'), keyboard: true),
   _Case('Add staff', (_) => const AddStaffScreen(token: 't')),

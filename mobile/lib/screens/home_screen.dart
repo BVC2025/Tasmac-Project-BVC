@@ -9,6 +9,7 @@ import '../services/geofence_monitor.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/confirm_logout.dart';
+import '../widgets/list_search.dart';
 import 'login_screen.dart';
 import 'password_requests_screen.dart';
 import 'refund_history_screen.dart';
@@ -167,6 +168,33 @@ class _HomeScreenState extends State<HomeScreen> {
           title: 'Manage Shops',
           subtitle: 'TASMAC outlet locations',
           onTap: () => _open((_) => ShopListScreen(token: widget.token)),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _HistoryCard(
+                color: _refundGreen,
+                icon: Icons.check,
+                title: 'Refunds',
+                subtitle: 'All shops',
+                todayCount: null,
+                onTap: () => _open((_) => RefundHistoryScreen(token: widget.token, allShops: true)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _HistoryCard(
+                color: _rejectRed,
+                icon: Icons.close,
+                title: 'Rejections',
+                subtitle: 'All shops',
+                todayCount: null,
+                onTap: () => _open((_) => RejectHistoryScreen(token: widget.token, allShops: true)),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         _NavCard(
@@ -868,22 +896,49 @@ class _NavCard extends StatelessWidget {
 }
 
 /// Every return this staff member has processed, newest first.
-class _AllScansScreen extends StatelessWidget {
+class _AllScansScreen extends StatefulWidget {
   final String token;
   final List<dynamic> returns;
 
   const _AllScansScreen({required this.token, required this.returns});
 
   @override
+  State<_AllScansScreen> createState() => _AllScansScreenState();
+}
+
+class _AllScansScreenState extends State<_AllScansScreen> {
+  String _query = '';
+
+  @override
   Widget build(BuildContext context) {
+    final returns = widget.returns.cast<Map<String, dynamic>>().where((item) {
+      return matchesSearch(_query, [
+        item['refund_qr_code'] ?? item['qr_code'],
+        item['manufacturing_qr_code'],
+        item['brand_name'],
+        item['bottle_size'],
+        item['status'] == 'verified' ? 'refunded' : item['status'],
+        item['rejection_reason']?.toString().replaceAll('_', ' '),
+        item['shop_name'],
+      ]);
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('All Scans')),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: returns.length,
-        separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, index) => _ScanTile(item: returns[index] as Map<String, dynamic>, token: token),
+      appBar: AppBar(
+        title: const Text('All Scans'),
+        bottom: ListSearchBar(
+          hint: 'Search QR, brand, size, refunded/rejected…',
+          onChanged: (query) => setState(() => _query = query),
+        ),
       ),
+      body: returns.isEmpty
+          ? const Center(child: Text('No results for this search.'))
+          : ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: returns.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) => _ScanTile(item: returns[index], token: widget.token),
+            ),
     );
   }
 }

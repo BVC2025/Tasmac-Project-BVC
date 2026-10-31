@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
+import '../widgets/list_search.dart';
 import '../widgets/reset_password_dialog.dart';
 import 'add_staff_screen.dart';
 
@@ -19,6 +20,7 @@ class StaffListScreen extends StatefulWidget {
 class _StaffListScreenState extends State<StaffListScreen> {
   final _apiService = ApiService();
   late Future<List<dynamic>> _staffFuture;
+  String _query = '';
 
   @override
   void initState() {
@@ -32,9 +34,43 @@ class _StaffListScreenState extends State<StaffListScreen> {
     });
   }
 
-  Future<void> _deactivate(int staffId) async {
+  Future<void> _edit(Map<String, dynamic> member) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => AddStaffScreen(token: widget.token, staff: member)),
+    );
+    if (saved == true) _refresh();
+  }
+
+  Future<void> _reactivate(int staffId) async {
     try {
-      await _apiService.deactivateStaff(widget.token, staffId);
+      await _apiService.reactivateStaff(widget.token, staffId);
+      _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _deactivate(Map<String, dynamic> member) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Deactivate staff?'),
+        content: Text('${member['full_name']} will no longer be able to log in. You can reactivate them later.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Deactivate'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await _apiService.deactivateStaff(widget.token, member['id'] as int);
       _refresh();
     } catch (e) {
       if (!mounted) return;
@@ -45,7 +81,13 @@ class _StaffListScreenState extends State<StaffListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Staff')),
+      appBar: AppBar(
+        title: const Text('Manage Staff'),
+        bottom: ListSearchBar(
+          hint: 'Search name, User ID, phone, shop…',
+          onChanged: (query) => setState(() => _query = query),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
@@ -65,9 +107,23 @@ class _StaffListScreenState extends State<StaffListScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final staff = snapshot.data ?? [];
-          if (staff.isEmpty) {
+          final all = snapshot.data ?? [];
+          if (all.isEmpty) {
             return const Center(child: Text('No staff yet.'));
+          }
+          final staff = all.where((item) {
+            final m = item as Map<String, dynamic>;
+            return matchesSearch(_query, [
+              m['full_name'],
+              m['user_id'],
+              m['phone_number'],
+              m['role'],
+              m['shop_name'],
+              m['is_active'] == true ? 'active' : 'inactive',
+            ]);
+          }).toList();
+          if (staff.isEmpty) {
+            return const Center(child: Text('No results for this search.'));
           }
 
           return ListView.separated(
@@ -87,29 +143,38 @@ class _StaffListScreenState extends State<StaffListScreen> {
                   onPhotoChanged: _refresh,
                 ),
                 title: Text(member['full_name'] ?? ''),
-                subtitle: Text('ID: ${member['user_id']} • ${member['phone_number']} • ${member['role']}'),
-                trailing: isActive
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            icon: const Icon(Icons.key, color: Colors.blueGrey),
-                            tooltip: 'Reset password',
-                            onPressed: () => showResetPasswordDialog(
-                              context,
-                              token: widget.token,
-                              staffId: member['id'] as int,
-                              staffName: member['full_name'] ?? '',
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.block, color: Colors.red),
-                            tooltip: 'Deactivate',
-                            onPressed: () => _deactivate(member['id'] as int),
-                          ),
-                        ],
-                      )
-                    : const Text('Inactive', style: TextStyle(color: Colors.grey)),
+                subtitle: Text(
+                  'ID: ${member['user_id']} • ${member['phone_number']} • ${member['role']}'
+                  '${member['shop_name'] != null ? '\n${member['shop_name']}' : ''}'
+                  '${isActive ? '' : '\nInactive'}',
+                ),
+                // One menu instead of a row of icons, so it fits narrow POS screens.
+                trailing: PopupMenuButton<void>(
+                  tooltip: 'Staff options',
+                  itemBuilder: (context) => [
+                    PopupMenuItem<void>(onTap: () => _edit(member), child: const Text('Edit details')),
+                    if (isActive) ...[
+                      PopupMenuItem<void>(
+                        onTap: () => showResetPasswordDialog(
+                          context,
+                          token: widget.token,
+                          staffId: member['id'] as int,
+                          staffName: member['full_name'] ?? '',
+                          staffPhone: member['phone_number'] as String?,
+                        ),
+                        child: const Text('Reset password'),
+                      ),
+                      PopupMenuItem<void>(
+                        onTap: () => _deactivate(member),
+                        child: const Text('Deactivate', style: TextStyle(color: Colors.red)),
+                      ),
+                    ] else
+                      PopupMenuItem<void>(
+                        onTap: () => _reactivate(member['id'] as int),
+                        child: const Text('Reactivate'),
+                      ),
+                  ],
+                ),
               );
             },
           );

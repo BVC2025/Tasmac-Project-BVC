@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../widgets/list_search.dart';
 import 'add_shop_screen.dart';
 
 class ShopListScreen extends StatefulWidget {
@@ -15,6 +16,7 @@ class ShopListScreen extends StatefulWidget {
 class _ShopListScreenState extends State<ShopListScreen> {
   final _apiService = ApiService();
   late Future<List<dynamic>> _shopsFuture;
+  String _query = '';
 
   @override
   void initState() {
@@ -191,7 +193,13 @@ class _ShopListScreenState extends State<ShopListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Shops')),
+      appBar: AppBar(
+        title: const Text('Manage Shops'),
+        bottom: ListSearchBar(
+          hint: 'Search shop name, code, address…',
+          onChanged: (query) => setState(() => _query = query),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final created = await Navigator.of(context).push<bool>(
@@ -211,9 +219,21 @@ class _ShopListScreenState extends State<ShopListScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final shops = snapshot.data ?? [];
-          if (shops.isEmpty) {
+          final all = snapshot.data ?? [];
+          if (all.isEmpty) {
             return const Center(child: Text('No shops yet.'));
+          }
+          final shops = all.where((item) {
+            final shop = item as Map<String, dynamic>;
+            return matchesSearch(_query, [
+              shop['name'],
+              shop['shop_code'],
+              shop['address'],
+              shop['is_active'] == true ? 'active' : 'inactive',
+            ]);
+          }).toList();
+          if (shops.isEmpty) {
+            return const Center(child: Text('No results for this search.'));
           }
 
           return ListView.separated(

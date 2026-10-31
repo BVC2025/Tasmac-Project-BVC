@@ -185,6 +185,50 @@ class ApiService {
     throw ApiException(_errorMessage(response, 'Could not reset password'));
   }
 
+  Future<Map<String, dynamic>> updateStaff(
+    String token,
+    int staffId, {
+    required String fullName,
+    required String userId,
+    required String phoneNumber,
+    required String role,
+    required int? shopId,
+  }) async {
+    final response = await _send(
+      () => http.patch(
+        Uri.parse('$baseUrl/staff/$staffId'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({
+          'full_name': fullName,
+          'user_id': userId,
+          'phone_number': phoneNumber,
+          'role': role,
+          'shop_id': shopId,
+        }),
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+
+    throw ApiException(_errorMessage(response, 'Could not update staff'));
+  }
+
+  Future<void> reactivateStaff(String token, int staffId) async {
+    final response = await _send(
+      () => http.patch(
+        Uri.parse('$baseUrl/staff/$staffId'),
+        headers: _jsonHeaders(token),
+        body: jsonEncode({'is_active': true}),
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      throw ApiException(_errorMessage(response, 'Could not reactivate staff'));
+    }
+  }
+
   /// Sends a "forgot password" request to the admins. Returns the backend's
   /// confirmation text, which is the same whether or not the User ID exists.
   Future<String> requestPasswordReset(String userId, {String? message}) async {
@@ -213,19 +257,6 @@ class ApiService {
     }
 
     throw ApiException(_errorMessage(response, 'Could not load password requests'));
-  }
-
-  Future<void> dismissPasswordResetRequest(String token, int staffId) async {
-    final response = await _send(
-      () => http.post(
-        Uri.parse('$baseUrl/staff/$staffId/password-reset-requests/dismiss'),
-        headers: _authHeaders(token),
-      ),
-    );
-
-    if (response.statusCode != 204) {
-      throw ApiException(_errorMessage(response, 'Could not dismiss the request'));
-    }
   }
 
   Future<Map<String, dynamic>> deactivateStaff(String token, int staffId) async {
@@ -549,6 +580,19 @@ class ApiService {
     }
 
     throw ApiException(_errorMessage(response, 'Could not load return history'));
+  }
+
+  /// Admin only: every return from every shop and staff member.
+  Future<List<dynamic>> listAllReturns(String token) async {
+    final response = await _send(
+      () => http.get(Uri.parse('$baseUrl/returns'), headers: _authHeaders(token)),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as List<dynamic>;
+    }
+
+    throw ApiException(_errorMessage(response, 'Could not load returns'));
   }
 
   /// The backend's own error message, or [fallback] tagged with the HTTP

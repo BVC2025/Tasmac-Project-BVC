@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import '../services/auth_storage.dart';
 import '../theme/app_colors.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'location_gate_screen.dart';
 
@@ -83,67 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _forgotPassword() async {
-    final userIdController = TextEditingController(text: _userIdController.text.trim());
-    final messageController = TextEditingController();
-
-    final send = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Forgot Password'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Your admin will get a request to reset your password and will share the new one with you.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: userIdController,
-                decoration: const InputDecoration(labelText: 'Your User ID', prefixIcon: Icon(Icons.badge_outlined)),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: messageController,
-                maxLength: 200,
-                decoration: const InputDecoration(labelText: 'Message to admin (optional)'),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Send Request')),
-        ],
-      ),
+  void _forgotPassword() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ForgotPasswordScreen(initialUserId: _userIdController.text.trim())),
     );
-
-    final userId = userIdController.text.trim();
-    if (send != true) return;
-    if (userId.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter your User ID to send the request.')));
-      return;
-    }
-
-    try {
-      final confirmation = await _apiService.requestPasswordReset(userId, message: messageController.text.trim());
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          icon: const Icon(Icons.mark_email_read_outlined, color: AppColors.primaryGreen),
-          title: const Text('Request Sent'),
-          content: Text(confirmation),
-          actions: [FilledButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('OK'))],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
   }
 
   @override

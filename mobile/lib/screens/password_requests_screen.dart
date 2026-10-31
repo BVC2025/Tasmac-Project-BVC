@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/list_search.dart';
 import '../widgets/reset_password_dialog.dart';
 
 /// Admin inbox of staff "forgot password" requests sent from the login
-/// screen. Resetting the password (or dismissing) closes the request.
+/// screen. A request stays here until the admin resets that staff member's
+/// password (there is deliberately no "dismiss", so none get lost); the reset
+/// dialog then offers to SMS the new password to the staff member.
 class PasswordRequestsScreen extends StatefulWidget {
   final String token;
 
@@ -18,6 +21,7 @@ class PasswordRequestsScreen extends StatefulWidget {
 class _PasswordRequestsScreenState extends State<PasswordRequestsScreen> {
   final _apiService = ApiService();
   late Future<List<dynamic>> _requestsFuture = _apiService.listPasswordResetRequests(widget.token);
+  String _query = '';
 
   void _refresh() {
     setState(() => _requestsFuture = _apiService.listPasswordResetRequests(widget.token));
@@ -29,24 +33,21 @@ class _PasswordRequestsScreenState extends State<PasswordRequestsScreen> {
       token: widget.token,
       staffId: staff['id'] as int,
       staffName: staff['full_name'] ?? '',
+      staffPhone: staff['phone_number'] as String?,
     );
     if (done) _refresh();
-  }
-
-  Future<void> _dismiss(Map<String, dynamic> staff) async {
-    try {
-      await _apiService.dismissPasswordResetRequest(widget.token, staff['id'] as int);
-      _refresh();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Password Requests')),
+      appBar: AppBar(
+        title: const Text('Password Requests'),
+        bottom: ListSearchBar(
+          hint: 'Search name, User ID, phone…',
+          onChanged: (query) => setState(() => _query = query),
+        ),
+      ),
       body: FutureBuilder<List<dynamic>>(
         future: _requestsFuture,
         builder: (context, snapshot) {
@@ -57,9 +58,23 @@ class _PasswordRequestsScreenState extends State<PasswordRequestsScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final requests = snapshot.data ?? [];
-          if (requests.isEmpty) {
+          final all = snapshot.data ?? [];
+          if (all.isEmpty) {
             return const Center(child: Text('No pending password requests.'));
+          }
+          final requests = all.where((item) {
+            final request = item as Map<String, dynamic>;
+            final staff = request['staff'] as Map<String, dynamic>;
+            return matchesSearch(_query, [
+              staff['full_name'],
+              staff['user_id'],
+              staff['phone_number'],
+              staff['shop_name'],
+              request['message'],
+            ]);
+          }).toList();
+          if (requests.isEmpty) {
+            return const Center(child: Text('No results for this search.'));
           }
 
           return RefreshIndicator(
@@ -72,7 +87,7 @@ class _PasswordRequestsScreenState extends State<PasswordRequestsScreen> {
                 final request = requests[index] as Map<String, dynamic>;
                 final staff = request['staff'] as Map<String, dynamic>;
                 final requestedAt = DateTime.tryParse(request['requested_at']?.toString() ?? '')?.toLocal();
-                final message = request['message'] as String?;
+                final message = (request['message'] as String?)?.trim();
 
                 return Card(
                   elevation: 0,
@@ -118,22 +133,41 @@ class _PasswordRequestsScreenState extends State<PasswordRequestsScreen> {
                             style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                           ),
                         ],
-                        if (message != null && message.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text('“$message”', style: const TextStyle(fontStyle: FontStyle.italic)),
-                        ],
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Message from staff',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                message == null || message.isEmpty ? 'No message was added.' : message,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontStyle: message == null || message.isEmpty ? FontStyle.italic : FontStyle.normal,
+                                  color: message == null || message.isEmpty ? AppColors.textSecondary : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            FilledButton.icon(
-                              onPressed: () => _reset(staff),
-                              icon: const Icon(Icons.key, size: 18),
-                              label: const Text('Reset password'),
-                            ),
-                            TextButton(onPressed: () => _dismiss(staff), child: const Text('Dismiss')),
-                          ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: () => _reset(staff),
+                            icon: const Icon(Icons.key, size: 18),
+                            label: const Text('Reset password'),
+                          ),
                         ),
                       ],
                     ),

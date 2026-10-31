@@ -1,10 +1,8 @@
 import random
 import time as time_module
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
@@ -30,12 +28,11 @@ from app.schemas.return_transaction import (
     VerifyRefundQrResponse,
     validate_product_barcode,
 )
+from app.services import stored_images
 from app.services.audit import log_action
 from app.services.shop_access import ensure_within_service_window
 
 router = APIRouter(prefix="/returns", tags=["returns"])
-
-EVIDENCE_DIR = Path("media/evidence")
 
 
 def _check_access(current_user: User, latitude: float, longitude: float) -> tuple[Shop, float]:
@@ -65,15 +62,6 @@ def _simulate_payment() -> tuple[bool, str]:
     success = random.random() < 0.85
     reference_id = f"SIM-{uuid.uuid4().hex[:10].upper()}"
     return success, reference_id
-
-
-async def _save_evidence_image(file: UploadFile) -> str:
-    EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = Path(file.filename or "").suffix or ".jpg"
-    filename = f"{uuid.uuid4().hex}{suffix}"
-    path = EVIDENCE_DIR / filename
-    path.write_bytes(await file.read())
-    return f"media/evidence/{filename}"
 
 
 def _to_out(transaction: ReturnTransaction) -> ReturnTransactionOut:
@@ -114,7 +102,7 @@ def _to_out(transaction: ReturnTransaction) -> ReturnTransactionOut:
         product_barcode=transaction.product_barcode,
         distance_meters=distance,
         created_at=transaction.created_at,
-        has_evidence_image=transaction.evidence_image_path is not None,
+        has_evidence_image=stored_images.is_available(transaction.evidence_image_path),
         payment_method=payment.method if payment else None,
         payment_amount=float(payment.amount) if payment else None,
         payment_reference=payment.reference_id if payment else None,
@@ -413,7 +401,7 @@ async def reject_return(
     if refund_qr_code:
         bottle = db.query(Bottle).filter(Bottle.refund_qr_code == refund_qr_code).first()
 
-    evidence_path = await _save_evidence_image(evidence_image) if evidence_image is not None else None
+    evidence_data = await stored_images.read_upload(evidence_image) if evidence_image is not None else None
 
     transaction = ReturnTransaction(
         bottle_id=bottle.id if bottle else None,
@@ -423,7 +411,8 @@ async def reject_return(
         latitude=latitude,
         longitude=longitude,
         rejection_reason=reason,
-        evidence_image_path=evidence_path,
+        evidence_image_path=stored_images.STORED_IN_DB if evidence_data else None,
+        evidence_image_data=evidence_data,
         remarks=remarks,
         product_barcode=product_barcode,
     )
@@ -473,11 +462,6 @@ def get_evidence_image(
     if not is_owner and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this evidence image")
 
-    if transaction.evidence_image_path is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No evidence image for this return")
-
-    image_path = Path(transaction.evidence_image_path)
-    if not image_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidence image file is missing")
-
-    return FileResponse(image_path)
+    return stored_images.image_response(
+        transaction.evidence_image_path, transaction.evidence_image_data, "No evidence image for this return"
+    )

@@ -13,6 +13,10 @@ from app.api.routes.returns import router as returns_router
 from app.api.routes.shop import router as shop_router
 from app.api.routes.staff import router as staff_router
 from app.core.config import settings
+from app.db.schema_patches import ensure_schema
+from app.db.session import engine
+
+ensure_schema(engine)
 
 app = FastAPI(title=settings.app_name)
 

@@ -1,7 +1,7 @@
 import enum
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Enum, ForeignKey, LargeBinary, Numeric, String, Text
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.mixins import TimestampMixin
@@ -42,6 +42,7 @@ class ReturnTransaction(TimestampMixin, Base):
         Enum(RejectionReason, name="rejection_reason"), nullable=True
     )
     evidence_image_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evidence_image_data: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_barcode: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payment_id: Mapped[int | None] = mapped_column(ForeignKey("payments.id"), nullable=True)

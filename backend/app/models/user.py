@@ -1,10 +1,11 @@
 import enum
 
-from sqlalchemy import Enum, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Enum, ForeignKey, LargeBinary, String
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.mixins import TimestampMixin
+from app.services.stored_images import is_available
 
 
 class UserRole(str, enum.Enum):
@@ -24,6 +25,8 @@ class User(TimestampMixin, Base):
     shop_id: Mapped[int | None] = mapped_column(ForeignKey("shops.id"), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     photo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Deferred so staff lists don't pull every photo's bytes.
+    photo_data: Mapped[bytes | None] = deferred(mapped_column(LargeBinary, nullable=True))
 
     shop: Mapped["Shop"] = relationship(back_populates="users")
 
@@ -37,4 +40,4 @@ class User(TimestampMixin, Base):
 
     @property
     def has_photo(self) -> bool:
-        return self.photo_path is not None
+        return is_available(self.photo_path)

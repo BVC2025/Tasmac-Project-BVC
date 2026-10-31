@@ -1,8 +1,4 @@
-import uuid
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_admin_user, get_current_user
@@ -10,20 +6,9 @@ from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.user import User, UserRole
 from app.schemas.staff import PasswordResetRequestOut, ResetPasswordRequest, StaffCreate, StaffOut, StaffUpdate
-from app.services import password_reset
+from app.services import password_reset, stored_images
 
 router = APIRouter(prefix="/staff", tags=["staff"])
-
-PHOTO_DIR = Path("media/staff_photos")
-
-
-async def _save_staff_photo(file: UploadFile) -> str:
-    PHOTO_DIR.mkdir(parents=True, exist_ok=True)
-    suffix = Path(file.filename or "").suffix or ".jpg"
-    filename = f"{uuid.uuid4().hex}{suffix}"
-    path = PHOTO_DIR / filename
-    path.write_bytes(await file.read())
-    return f"media/staff_photos/{filename}"
 
 
 @router.get("", response_model=list[StaffOut], dependencies=[Depends(get_current_admin_user)])
@@ -88,7 +73,17 @@ def update_staff(staff_id: int, payload: StaffUpdate, db: Session = Depends(get_
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    changes = payload.model_dump(exclude_unset=True)
+    if changes.get("user_id") and changes["user_id"] != user.user_id:
+        if db.query(User).filter(User.user_id == changes["user_id"], User.id != user.id).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User ID already registered")
+    if changes.get("phone_number") and changes["phone_number"] != user.phone_number:
+        if db.query(User).filter(User.phone_number == changes["phone_number"], User.id != user.id).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phone number already registered")
+
+    for field, value in changes.items():
+        if value is None and field in ("full_name", "user_id", "phone_number", "role", "is_active"):
+            continue  # required columns; an explicit null means "leave as is"
         setattr(user, field, value)
 
     db.commit()
@@ -133,7 +128,8 @@ async def upload_staff_photo(staff_id: int, photo: UploadFile = File(...), db: S
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
 
-    user.photo_path = await _save_staff_photo(photo)
+    user.photo_data = await stored_images.read_upload(photo)
+    user.photo_path = stored_images.STORED_IN_DB
     db.commit()
     db.refresh(user)
     return user
@@ -147,11 +143,6 @@ def get_staff_photo(staff_id: int, current_user: User = Depends(get_current_user
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to view this photo")
 
     user = db.get(User, staff_id)
-    if user is None or user.photo_path is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No photo for this staff member")
-
-    photo_path = Path(user.photo_path)
-    if not photo_path.exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Photo file is missing")
-
-    return FileResponse(photo_path)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff not found")
+    return stored_images.image_response(user.photo_path, user.photo_data, "No photo for this staff member")

@@ -5,10 +5,13 @@ import 'package:image_picker/image_picker.dart';
 
 import '../services/api_service.dart';
 
+/// Adds a new staff/admin account, or — when [staff] is given — edits that
+/// existing account (password changes go through "Reset password" instead).
 class AddStaffScreen extends StatefulWidget {
   final String token;
+  final Map<String, dynamic>? staff;
 
-  const AddStaffScreen({super.key, required this.token});
+  const AddStaffScreen({super.key, required this.token, this.staff});
 
   @override
   State<AddStaffScreen> createState() => _AddStaffScreenState();
@@ -30,11 +33,31 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   bool _obscurePassword = true;
   String? _errorMessage;
   late Future<List<dynamic>> _shopsFuture;
+  Uint8List? _existingPhoto;
+
+  bool get _isEdit => widget.staff != null;
 
   @override
   void initState() {
     super.initState();
     _shopsFuture = _apiService.listShops(widget.token);
+
+    final staff = widget.staff;
+    if (staff != null) {
+      _nameController.text = staff['full_name'] ?? '';
+      _userIdController.text = staff['user_id'] ?? '';
+      _phoneController.text = staff['phone_number'] ?? '';
+      _role = staff['role'] as String? ?? 'staff';
+      _shopId = staff['shop_id'] as int?;
+      if (staff['has_photo'] == true) _loadExistingPhoto(staff['id'] as int);
+    }
+  }
+
+  Future<void> _loadExistingPhoto(int staffId) async {
+    try {
+      final bytes = await _apiService.getStaffPhoto(widget.token, staffId);
+      if (mounted) setState(() => _existingPhoto = bytes);
+    } catch (_) {}
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
@@ -58,15 +81,25 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
     });
 
     try {
-      final staff = await _apiService.createStaff(
-        widget.token,
-        fullName: _nameController.text.trim(),
-        userId: _userIdController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        password: _passwordController.text,
-        role: _role,
-        shopId: _shopId,
-      );
+      final staff = _isEdit
+          ? await _apiService.updateStaff(
+              widget.token,
+              widget.staff!['id'] as int,
+              fullName: _nameController.text.trim(),
+              userId: _userIdController.text.trim(),
+              phoneNumber: _phoneController.text.trim(),
+              role: _role,
+              shopId: _shopId,
+            )
+          : await _apiService.createStaff(
+              widget.token,
+              fullName: _nameController.text.trim(),
+              userId: _userIdController.text.trim(),
+              phoneNumber: _phoneController.text.trim(),
+              password: _passwordController.text,
+              role: _role,
+              shopId: _shopId,
+            );
 
       final photoBytes = _photoBytes;
       if (photoBytes != null) {
@@ -100,7 +133,7 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Staff')),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Staff' : 'Add Staff')),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -118,8 +151,10 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                         CircleAvatar(
                           radius: 44,
                           backgroundColor: Colors.grey.shade200,
-                          backgroundImage: _photoBytes != null ? MemoryImage(_photoBytes!) : null,
-                          child: _photoBytes == null
+                          backgroundImage: (_photoBytes ?? _existingPhoto) != null
+                              ? MemoryImage((_photoBytes ?? _existingPhoto)!)
+                              : null,
+                          child: (_photoBytes ?? _existingPhoto) == null
                               ? const Icon(Icons.person_outline, size: 44, color: Colors.grey)
                               : null,
                         ),
@@ -160,20 +195,22 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                     decoration: const InputDecoration(labelText: 'Phone Number', border: OutlineInputBorder()),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter phone number' : null,
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  if (!_isEdit) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        ),
                       ),
+                      validator: (v) => (v == null || v.length < 4) ? 'Min 4 characters' : null,
                     ),
-                    validator: (v) => (v == null || v.length < 4) ? 'Min 4 characters' : null,
-                  ),
+                  ],
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     initialValue: _role,
@@ -189,7 +226,12 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                     future: _shopsFuture,
                     builder: (context, snapshot) {
                       final shops = snapshot.data ?? [];
+                      // While the list loads (or if the staff's shop isn't in
+                      // it), the current shop must still be one of the items —
+                      // a dropdown value with no matching item throws.
+                      final currentMissing = _shopId != null && !shops.any((shop) => shop['id'] == _shopId);
                       return DropdownButtonFormField<int?>(
+                        key: ValueKey(shops.length),
                         initialValue: _shopId,
                         isExpanded: true,
                         decoration: const InputDecoration(
@@ -198,6 +240,14 @@ class _AddStaffScreenState extends State<AddStaffScreen> {
                         ),
                         items: [
                           const DropdownMenuItem<int?>(value: null, child: Text('None')),
+                          if (currentMissing)
+                            DropdownMenuItem<int?>(
+                              value: _shopId,
+                              child: Text(
+                                widget.staff?['shop_name'] as String? ?? 'Shop #$_shopId',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ...shops.map(
                             (shop) => DropdownMenuItem<int?>(
                               value: shop['id'] as int,

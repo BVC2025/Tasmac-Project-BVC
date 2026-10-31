@@ -17,6 +17,7 @@ class StaffCreate(BaseModel):
 class StaffUpdate(BaseModel):
     full_name: str | None = None
     user_id: str | None = None
+    phone_number: str | None = None
     role: UserRole | None = None
     shop_id: int | None = None
     is_active: bool | None = None

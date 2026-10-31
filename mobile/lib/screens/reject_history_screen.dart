@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 import '../models/bottle_label.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/list_search.dart';
 import 'return_detail_screen.dart';
 
 /// Rejected returns only — successful ones live in [RefundHistoryScreen].
 class RejectHistoryScreen extends StatefulWidget {
   final String token;
 
-  const RejectHistoryScreen({super.key, required this.token});
+  /// Admin view: every shop's returns instead of only this user's.
+  final bool allShops;
+
+  const RejectHistoryScreen({super.key, required this.token, this.allShops = false});
 
   @override
   State<RejectHistoryScreen> createState() => _RejectHistoryScreenState();
@@ -18,6 +22,7 @@ class RejectHistoryScreen extends StatefulWidget {
 class _RejectHistoryScreenState extends State<RejectHistoryScreen> {
   final _apiService = ApiService();
   late Future<List<dynamic>> _returnsFuture;
+  String _query = '';
 
   @override
   void initState() {
@@ -26,14 +31,22 @@ class _RejectHistoryScreenState extends State<RejectHistoryScreen> {
   }
 
   Future<List<dynamic>> _load() async {
-    final all = await _apiService.listMyReturns(widget.token);
+    final all = widget.allShops
+        ? await _apiService.listAllReturns(widget.token)
+        : await _apiService.listMyReturns(widget.token);
     return all.where((item) => (item as Map<String, dynamic>)['status'] == 'rejected').toList();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reject')),
+      appBar: AppBar(
+        title: const Text('Reject'),
+        bottom: ListSearchBar(
+          hint: 'Search QR, brand, size, reason…',
+          onChanged: (query) => setState(() => _query = query),
+        ),
+      ),
       body: FutureBuilder<List<dynamic>>(
         future: _returnsFuture,
         builder: (context, snapshot) {
@@ -44,9 +57,13 @@ class _RejectHistoryScreenState extends State<RejectHistoryScreen> {
             return Center(child: Text('Error: ${snapshot.error}'));
           }
 
-          final returns = snapshot.data ?? [];
-          if (returns.isEmpty) {
+          final all = snapshot.data ?? [];
+          if (all.isEmpty) {
             return const Center(child: Text('No rejections logged yet.'));
+          }
+          final returns = all.where((item) => matchesSearch(_query, _searchFields(item as Map<String, dynamic>))).toList();
+          if (returns.isEmpty) {
+            return const Center(child: Text('No results for this search.'));
           }
 
           return ListView.separated(
@@ -90,3 +107,18 @@ class _RejectHistoryScreenState extends State<RejectHistoryScreen> {
     return '$hour:$minute $period';
   }
 }
+
+/// Every field a staff member might search a return by.
+List<Object?> _searchFields(Map<String, dynamic> item) => [
+      item['qr_code'],
+      item['refund_qr_code'],
+      item['manufacturing_qr_code'],
+      item['brand_name'],
+      item['bottle_size'],
+      item['shop_name'],
+      item['rejection_reason']?.toString().replaceAll('_', ' '),
+      item['remarks'],
+      item['payment_reference'],
+      item['payment_customer_identifier'],
+      item['created_at'],
+    ];
