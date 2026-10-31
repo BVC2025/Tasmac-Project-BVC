@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 
 import '../screens/geofence_lost_screen.dart';
 import 'api_service.dart';
+import 'location_service.dart';
 
 /// Runs for the whole staff session (started once the initial geofence gate
 /// is passed) and re-checks the device's distance from the assigned shop on
@@ -43,6 +43,7 @@ class GeofenceMonitor {
     _token = null;
     _navigatorKey = null;
     _blocked = false;
+    LocationService.instance.stop();
   }
 
   Future<void> _check() async {
@@ -50,17 +51,12 @@ class GeofenceMonitor {
     _checking = true;
 
     try {
-      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) return;
-
-      final permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        return;
-      }
-
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium),
-      );
+      // Reuse the session's running GPS rather than a fresh one-off fix each
+      // time (slow on POS terminals without Google location services). A
+      // rough or stale reading proves nothing, so it is simply skipped.
+      await LocationService.instance.start(requestIfNeeded: false);
+      final position = LocationService.instance.freshFix;
+      if (position == null) return;
 
       final token = _token;
       if (token == null) return;
@@ -70,7 +66,13 @@ class GeofenceMonitor {
       final navigator = _navigatorKey?.currentState;
       if (navigator == null) return;
 
-      if (!withinRange && !_blocked) {
+      // Only block when outside even allowing for the reading's error margin,
+      // so GPS drift alone can't lock staff out mid-shift.
+      final distance = (result['distance_meters'] as num).toDouble();
+      final radius = (result['radius_meters'] as num).toDouble();
+      final definitelyOutside = distance - position.accuracy > radius;
+
+      if (!withinRange && definitelyOutside && !_blocked) {
         _blocked = true;
         navigator.push(
           MaterialPageRoute(
@@ -79,7 +81,7 @@ class GeofenceMonitor {
             fullscreenDialog: true,
           ),
         );
-      } else if (withinRange && _blocked) {
+      } else if (withinRange && position.accuracy <= LocationService.trustedAccuracyMeters && _blocked) {
         _blocked = false;
         if (navigator.canPop()) navigator.pop();
       }

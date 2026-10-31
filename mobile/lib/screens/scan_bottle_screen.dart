@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../models/bottle_label.dart';
 import '../services/api_service.dart';
+import '../services/location_service.dart';
 import '../services/voice_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/centered_scroll_view.dart';
@@ -80,26 +80,14 @@ class _ScanBottleScreenState extends State<ScanBottleScreen> {
   Future<void> _ensureLocation() async {
     if (_latitude != null && _longitude != null) return;
 
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) throw Exception('Location services are disabled');
-
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    // The session's GPS has been running since Verify Location, so this is
+    // normally instant — even on POS terminals where a cold fix takes minutes.
+    final position = await LocationService.instance.waitForTrustedFix(const Duration(seconds: 30));
+    if (position == null) {
+      throw Exception('Could not get a GPS fix — move near the shop entrance or a window and try again');
     }
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-      throw Exception('Location permission is required to process a return');
-    }
-
-    try {
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)),
-      );
-      _latitude = position.latitude;
-      _longitude = position.longitude;
-    } on TimeoutException {
-      throw Exception('Could not get a GPS fix — move to an open area and try again');
-    }
+    _latitude = position.latitude;
+    _longitude = position.longitude;
   }
 
   void _startScanning(int count) {

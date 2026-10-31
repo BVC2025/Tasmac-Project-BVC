@@ -68,6 +68,7 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
+    if (response.statusCode >= 500) throw ServerUnavailableException();
     throw ApiException(_errorMessage(response, 'Login failed'));
   }
 
@@ -80,7 +81,18 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
 
-    throw ApiException('Could not fetch profile');
+    // 5xx (e.g. Render's gateway while the server wakes up) is "can't tell
+    // right now", not "your session is invalid" — callers must not log out.
+    if (response.statusCode >= 500) throw ServerUnavailableException();
+    throw ApiException(_errorMessage(response, 'Could not fetch profile'), statusCode: response.statusCode);
+  }
+
+  /// Fire-and-forget request that starts waking the backend (Render's free
+  /// tier sleeps when idle, and waking takes ~50 s) while staff are still
+  /// looking at the login screen, so their actual login isn't the one that
+  /// pays for the wake-up.
+  void wakeUpServer() {
+    http.get(Uri.parse('$baseUrl/health')).timeout(const Duration(seconds: 90)).ignore();
   }
 
   Future<List<dynamic>> listStaff(String token) async {

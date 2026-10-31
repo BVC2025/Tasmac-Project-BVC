@@ -266,6 +266,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               const SizedBox(height: 8),
+              if (_isLoading) ...[
+                const Text(
+                  'Signing in… if the server was idle this can take up to a minute.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+              ],
               if (_errorMessage != null) ...[
                 Container(
                   width: double.infinity,
