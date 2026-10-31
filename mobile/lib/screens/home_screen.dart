@@ -112,31 +112,34 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         _ScanHeroCard(onTap: () => _open((_) => ScanBottleScreen(token: widget.token, user: widget.user))),
         const SizedBox(height: 14),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _HistoryCard(
-                color: _refundGreen,
-                icon: Icons.check,
-                title: 'Refund',
-                subtitle: 'Successful returns',
-                todayCount: snapshot.hasData ? refundedToday : null,
-                onTap: () => _open((_) => RefundHistoryScreen(token: widget.token)),
+        // IntrinsicHeight + stretch: both cards take the taller one's height.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _HistoryCard(
+                  color: _refundGreen,
+                  icon: Icons.check,
+                  title: 'Refund',
+                  subtitle: 'Successful returns',
+                  todayCount: snapshot.hasData ? refundedToday : null,
+                  onTap: () => _open((_) => RefundHistoryScreen(token: widget.token)),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _HistoryCard(
-                color: _rejectRed,
-                icon: Icons.close,
-                title: 'Reject',
-                subtitle: 'Rejected returns & reasons',
-                todayCount: snapshot.hasData ? rejectedToday : null,
-                onTap: () => _open((_) => RejectHistoryScreen(token: widget.token)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _HistoryCard(
+                  color: _rejectRed,
+                  icon: Icons.close,
+                  title: 'Reject',
+                  subtitle: 'Rejected returns',
+                  todayCount: snapshot.hasData ? rejectedToday : null,
+                  onTap: () => _open((_) => RejectHistoryScreen(token: widget.token)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 14),
         _RecentScansCard(
@@ -170,31 +173,34 @@ class _HomeScreenState extends State<HomeScreen> {
           onTap: () => _open((_) => ShopListScreen(token: widget.token)),
         ),
         const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _HistoryCard(
-                color: _refundGreen,
-                icon: Icons.check,
-                title: 'Refunds',
-                subtitle: 'All shops',
-                todayCount: null,
-                onTap: () => _open((_) => RefundHistoryScreen(token: widget.token, allShops: true)),
+        // IntrinsicHeight + stretch: both cards take the taller one's height.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _HistoryCard(
+                  color: _refundGreen,
+                  icon: Icons.check,
+                  title: 'Refunds',
+                  subtitle: 'All shops',
+                  todayCount: null,
+                  onTap: () => _open((_) => RefundHistoryScreen(token: widget.token, allShops: true)),
+                ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _HistoryCard(
-                color: _rejectRed,
-                icon: Icons.close,
-                title: 'Rejections',
-                subtitle: 'All shops',
-                todayCount: null,
-                onTap: () => _open((_) => RejectHistoryScreen(token: widget.token, allShops: true)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _HistoryCard(
+                  color: _rejectRed,
+                  icon: Icons.close,
+                  title: 'Rejections',
+                  subtitle: 'All shops',
+                  todayCount: null,
+                  onTap: () => _open((_) => RejectHistoryScreen(token: widget.token, allShops: true)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         const SizedBox(height: 12),
         _NavCard(
@@ -636,10 +642,14 @@ class _HistoryCard extends StatelessWidget {
                                 color: Colors.white.withValues(alpha: 0.18),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                '$todayCount today',
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                              // Shrinks rather than cutting to "2 tod…" on narrow POS screens.
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '$todayCount today',
+                                  maxLines: 1,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ),
                     ),
@@ -647,6 +657,9 @@ class _HistoryCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
+              // Pushes the title to the bottom when the paired card is taller,
+              // so both cards in a row line up.
+              const Spacer(),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -654,14 +667,21 @@ class _HistoryCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          title,
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                        // One line, shrunk if needed: on ~320-wide POS screens
+                        // "Rejections" otherwise broke mid-word.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           subtitle,
-                          maxLines: 2,
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12),
                         ),
